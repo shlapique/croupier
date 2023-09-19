@@ -16,7 +16,7 @@ class Card:
         self.date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S%z").strftime("%Y.%m.%d(%H:%M:%S)")
     
 def main():
-    print("Choose file(s) to download: ")
+    print("Choose file(s) to download 🥸: ")
     headers = {'Authorization': 'OAuth ' + token}
     params = {'path': '/kindle'}
     try:
@@ -27,6 +27,8 @@ def main():
 
     cards = []
     items = response.json()['_embedded']['items']
+
+    # for pretty output
     max_name = max(len(str(x['name'])) for x in items)
     max_size = max(len(str(x['size'])) for x in items)
     max_date = max(len(str(x['modified'])) for x in items)
@@ -39,9 +41,18 @@ def main():
         print(f"[{len(cards)-1}]  {card.name.ljust(max_name)}  {str(card.size).ljust(max_size)}  {card.date.ljust(max_date)}")
 
     list_to_get = input(f"[enter number(s) (0..{len(cards)-1})]: ")
+    list_to_get = [int(x) for x in list_to_get.split()]
+    list_to_get = list(set(list_to_get)) # rm dublicates
     print(list_to_get)
+    for i in list_to_get:
+        try:
+            response = requests.get(cards[i].url)
+            open(cards[i].name, 'wb').write(response.content)
+            print(cards[i].name, '✔')
+        except requests.exceptions.RequestException as e:
+            print("ERROR")
+            print(e)
+            print(cards[i].name, '✘')
 
 if __name__ == "__main__":
     main()
-# curl -H "Authorization: OAuth $token" https://cloud-api.yandex.net/v1/disk/resources?path=%2Fkindle | jq '._embedded.items[].name'
-# wget $(curl -s -H "Authorization: OAuth $token" https://cloud-api.yandex.net/v1/disk/resources/download?path=%2Fkindle%2F${file} | jq -r '.href') -O ${file}
