@@ -1,22 +1,22 @@
 #!/usr/bin/python3
-from pprint import pprint
 from datetime import datetime
-import sys
-
-import urllib.parse as ul
 import requests
 token = TOKEN
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
+
 
 class Card:
     def __init__(self, name, url, size, date):
         self.name = name
         self.url = url
         self.size = size
-        self.date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S%z").strftime("%Y.%m.%d(%H:%M:%S)")
-    
+        self.date = datetime.strptime(
+                date,
+                "%Y-%m-%dT%H:%M:%S%z").strftime("%Y.%m.%d(%H:%M:%S)")
+
+
 def main():
-    print("Choose file(s) to download 🥸: ")
+    print("Choose file(s) to download 🠯: ")
     headers = {'Authorization': 'OAuth ' + token}
     params = {'path': '/kindle'}
     try:
@@ -34,15 +34,18 @@ def main():
     max_date = max(len(str(x['modified'])) for x in items)
     for item in items:
         card = Card(item['name'],
-                  item['file'],
-                  item['size'],
-                  item['modified'])
+                    item['file'],
+                    item['size'],
+                    item['modified'])
         cards.append(card)
         print(f"[{len(cards)-1}]  {card.name.ljust(max_name)}  {str(card.size).ljust(max_size)}  {card.date.ljust(max_date)}")
 
-    list_to_get = input(f"[enter number(s) (0..{len(cards)-1})]: ")
-    list_to_get = [int(x) for x in list_to_get.split()]
-    list_to_get = list(set(list_to_get)) # rm dublicates
+    list_to_get = input(f"[enter number(s) (0..{len(cards)-1} | A -- for all)]: ")
+    if list_to_get == 'A':
+        list_to_get = list(range(len(cards)))
+    else:
+        list_to_get = [int(x) for x in list_to_get.split()]
+        list_to_get = list(set(list_to_get))  # rm dublicates
     print(list_to_get)
     for i in list_to_get:
         try:
@@ -53,6 +56,7 @@ def main():
             print("ERROR")
             print(e)
             print(cards[i].name, '✘')
+
 
 if __name__ == "__main__":
     main()
