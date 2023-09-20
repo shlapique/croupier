@@ -39,6 +39,7 @@ def main():
     items = response.json()['_embedded']['items']
 
     # for pretty output
+    n = len(str(len(items)))
     max_name = max(len(str(x['name'])) for x in items)
     max_size = max(len(str(human_size(x['size']))) for x in items)
     max_date = max(len(str(x['modified'])) for x in items)
@@ -48,9 +49,9 @@ def main():
                     item['size'],
                     item['modified'])
         cards.append(card)
-        print(f"[{len(cards)-1}]  {card.name.ljust(max_name)}  {str(card.size).ljust(max_size)}  {card.date.ljust(max_date)}")
+        print(f"[{str(len(cards)-1).rjust(n)}]  {card.name.ljust(max_name)}  {str(card.size).ljust(max_size)}  {card.date.ljust(max_date)}")
 
-    list_to_get = input(f"[enter number(s) (0..{len(cards)-1}|A)]: ")
+    list_to_get = input(f"\n[enter number(s) (0..{len(cards)-1}|A)]: ")
     if list_to_get == 'A':
         list_to_get = list(range(len(cards)))
     else:
