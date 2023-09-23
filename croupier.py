@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 from datetime import datetime
 import requests
-token = TOKEN
+import os
+token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
 
 
@@ -22,7 +23,7 @@ class Card:
         self.size = human_size(size)
         self.date = datetime.strptime(
                 date,
-                "%Y-%m-%dT%H:%M:%S%z").strftime("%Y.%m.%d(%H:%M:%S)")
+                "%Y-%m-%dT%H:%M:%S%z").strftime("%d.%m.%y(%H:%M)")
 
 
 def main():
@@ -49,7 +50,10 @@ def main():
                     item['size'],
                     item['modified'])
         cards.append(card)
-        print(f"[{str(len(cards)-1).rjust(n)}]  {card.name.ljust(max_name)}  {str(card.size).ljust(max_size)}  {card.date.ljust(max_date)}")
+        print(f"[{str(len(cards)-1).rjust(n)}]",
+              f"{card.name.ljust(max_name)}",
+              f"{str(card.size).ljust(max_size)}",
+              f"{card.date.ljust(max_date)}")
 
     list_to_get = input(f"\n[enter number(s) (0..{len(cards)-1}|A)]: ")
     if list_to_get == 'A':
