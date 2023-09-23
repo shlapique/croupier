@@ -2,10 +2,17 @@
 from datetime import datetime
 import requests
 import os
-from tqdm import tqdm
+import sys
+import itertools
 
 token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
+symbs = ['🌍', '🌏', '🌎']
+# symbs = ['🕛',
+#  '🕒',
+#  '🕕',
+#  '🕘']
+chars = itertools.cycle(symbs)
 
 
 def human_size(nbytes):
@@ -67,17 +74,14 @@ def main():
     for i in list_to_get:
         try:
             response = requests.get(cards[i].url, stream=True)
-            total_size = int(response.headers.get('contents-length', 0))
-            progress_bar = tqdm(total=total_size, unit='iB', unit_scale=True)
             with open(cards[i].name, 'wb') as file:
                 for data in response.iter_content(1024):
-                    progress_bar.update(len(data))
+                    sys.stdout.write('\r{}{}'.format(cards[i].name,
+                                                     next(chars)))
+                    sys.stdout.flush()
                     file.write(data)
-            progress_bar.close()
-            if total_size != 0 and progress_bar.n != total_size:
-                print("ERROR IN DOWNLOADING!")
-            else:
-                print(cards[i].name, '✔\n')
+                sys.stdout.write('\r{} ✔\n'.format(cards[i].name))
+                sys.stdout.flush()
         except requests.exceptions.RequestException as e:
             print("ERROR")
             print(e)
