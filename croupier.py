@@ -2,6 +2,8 @@
 from datetime import datetime
 import requests
 import os
+from tqdm import tqdm
+
 token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
 
@@ -64,13 +66,22 @@ def main():
     print(list_to_get)
     for i in list_to_get:
         try:
-            response = requests.get(cards[i].url)
-            open(cards[i].name, 'wb').write(response.content)
-            print(cards[i].name, '✔')
+            response = requests.get(cards[i].url, stream=True)
+            total_size = int(response.headers.get('contents-length', 0))
+            progress_bar = tqdm(total=total_size, unit='iB', unit_scale=True)
+            with open(cards[i].name, 'wb') as file:
+                for data in response.iter_content(1024):
+                    progress_bar.update(len(data))
+                    file.write(data)
+            progress_bar.close()
+            if total_size != 0 and progress_bar.n != total_size:
+                print("ERROR IN DOWNLOADING!")
+            else:
+                print(cards[i].name, '✔\n')
         except requests.exceptions.RequestException as e:
             print("ERROR")
             print(e)
-            print(cards[i].name, '✘')
+            print(cards[i].name, '✘\n')
 
 
 if __name__ == "__main__":
