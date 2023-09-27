@@ -5,13 +5,16 @@ import os
 import sys
 import itertools
 
+
+class TerminalColors:
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RESET = '\033[0m'
+
+
 token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
-symbs = ['🌍', '🌏', '🌎']
-# symbs = ['🕛',
-#  '🕒',
-#  '🕕',
-#  '🕘']
+symbs = ['◐', '◓', '◑', '◒']
 chars = itertools.cycle(symbs)
 
 
@@ -74,13 +77,25 @@ def main():
     for i in list_to_get:
         try:
             response = requests.get(cards[i].url, stream=True)
+            size = human_size(int(response.headers.get('Content-Length', 0)))
+            cur_size = 0
             with open(cards[i].name, 'wb') as file:
                 for data in response.iter_content(1024):
-                    sys.stdout.write('\r{}{}'.format(cards[i].name,
-                                                     next(chars)))
+                    cur_size += len(data)
+                    str_to_flash = '\r{}{} {} [{}/{}]'.format(
+                        TerminalColors.YELLOW,
+                        next(chars),
+                        cards[i].name,
+                        human_size(cur_size),
+                        size)
+                    sys.stdout.write(str_to_flash)
                     sys.stdout.flush()
                     file.write(data)
-                sys.stdout.write('\r{} ✔\n'.format(cards[i].name))
+                sys.stdout.write('\r' + ' ' * len(str_to_flash))
+                sys.stdout.write('\r{}✔ {}\n'.format(TerminalColors.GREEN,
+                                                     cards[i].name))
+                sys.stdout.flush()
+                sys.stdout.write(TerminalColors.RESET)
                 sys.stdout.flush()
         except requests.exceptions.RequestException as e:
             print("ERROR")
