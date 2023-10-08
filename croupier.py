@@ -16,7 +16,7 @@ token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
 symbs = ['◐', '◓', '◑', '◒']
 chars = itertools.cycle(symbs)
-term_cols = 38
+term_cols = 37
 
 
 def cut_str(string):
