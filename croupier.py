@@ -16,6 +16,15 @@ token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
 symbs = ['◐', '◓', '◑', '◒']
 chars = itertools.cycle(symbs)
+term_cols = 40
+
+
+def cut_str(string):
+    if len(string) > term_cols:
+        strr = string[:term_cols] + '...'
+        return strr
+    else:
+        return string 
 
 
 def human_size(nbytes):
@@ -62,8 +71,10 @@ def main():
                     item['size'],
                     item['modified'])
         cards.append(card)
+        long_name = cut_str(card.name)
         print(f"[{str(len(cards)-1).rjust(n)}]",
-              f"{card.name.ljust(max_name)}",
+              # f"{card.name.ljust(max_name)}",
+              f"{long_name.ljust(term_cols+3)}",
               f"{str(card.size).ljust(max_size)}",
               f"{card.date.ljust(max_date)}")
 
