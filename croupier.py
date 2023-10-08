@@ -16,7 +16,7 @@ token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
 symbs = ['◐', '◓', '◑', '◒']
 chars = itertools.cycle(symbs)
-term_cols = 40
+term_cols = 38
 
 
 def cut_str(string):
@@ -96,7 +96,7 @@ def main():
                     str_to_flash = '\r{}{} {} [{}/{}]'.format(
                         TerminalColors.YELLOW,
                         next(chars),
-                        cards[i].name,
+                        cut_str(cards[i].name),
                         human_size(cur_size),
                         size)
                     sys.stdout.write(str_to_flash)
@@ -104,7 +104,7 @@ def main():
                     file.write(data)
                 sys.stdout.write('\r' + ' ' * len(str_to_flash))
                 sys.stdout.write('\r{}✔ {}\n'.format(TerminalColors.GREEN,
-                                                     cards[i].name))
+                                                     cut_str(cards[i].name)))
                 sys.stdout.flush()
                 sys.stdout.write(TerminalColors.RESET)
                 sys.stdout.flush()
