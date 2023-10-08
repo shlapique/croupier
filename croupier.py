@@ -76,7 +76,7 @@ def main():
               # f"{card.name.ljust(max_name)}",
               f"{long_name.ljust(term_cols+3)}",
               f"{str(card.size).ljust(max_size)}",
-              f"{card.date.ljust(max_date)}")
+              f"{card.date.ljust(max_date)}".rstrip())
 
     list_to_get = input(f"\n[enter number(s) (0..{len(cards)-1}|A)]: ")
     if list_to_get == 'A':
