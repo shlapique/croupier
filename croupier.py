@@ -16,15 +16,16 @@ token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
 symbs = ['◐', '◓', '◑', '◒']
 chars = itertools.cycle(symbs)
-term_cols = 37
+term_cols = 72
+limit = 400
 
 
-def cut_str(string):
-    if len(string) > term_cols:
-        strr = string[:term_cols] + '...'
+def cut_str(string, offset):
+    if len(string) > offset:
+        strr = string[:offset-3] + '...'
         return strr
     else:
-        return string 
+        return string
 
 
 def human_size(nbytes):
@@ -50,7 +51,8 @@ class Card:
 def main():
     print("Choose file(s) to download 🃏: ")
     headers = {'Authorization': 'OAuth ' + token}
-    params = {'path': '/kindle'}
+    params = {'path': '/kindle',
+              'limit': limit}
     try:
         response = requests.get(url, params=params, headers=headers)
     except requests.exceptions.RequestException as e:
@@ -62,19 +64,20 @@ def main():
 
     # for pretty output
     n = len(str(len(items)))
-    max_name = max(len(str(x['name'])) for x in items)
+    # max_name = max(len(str(x['name'])) for x in items)
     max_size = max(len(str(human_size(x['size']))) for x in items)
     max_date = max(len(str(x['modified'])) for x in items)
+    offset = term_cols - (len(str(n)) + 2 + max_size + max_date + 3)
     for item in items:
         card = Card(item['name'],
                     item['file'],
                     item['size'],
                     item['modified'])
         cards.append(card)
-        long_name = cut_str(card.name)
+        long_name = cut_str(card.name, offset)
         print(f"[{str(len(cards)-1).rjust(n)}]",
               # f"{card.name.ljust(max_name)}",
-              f"{long_name.ljust(term_cols+3)}",
+              f"{long_name.ljust(offset)}",
               f"{str(card.size).ljust(max_size)}",
               f"{card.date.ljust(max_date)}".rstrip())
 
@@ -96,7 +99,7 @@ def main():
                     str_to_flash = '\r{}{} {} [{}/{}]'.format(
                         TerminalColors.YELLOW,
                         next(chars),
-                        cut_str(cards[i].name),
+                        cut_str(cards[i].name, offset),
                         human_size(cur_size),
                         size)
                     sys.stdout.write(str_to_flash)
@@ -104,7 +107,7 @@ def main():
                     file.write(data)
                 sys.stdout.write('\r' + ' ' * len(str_to_flash))
                 sys.stdout.write('\r{}✔ {}\n'.format(TerminalColors.GREEN,
-                                                     cut_str(cards[i].name)))
+                                                     cut_str(cards[i].name, offset)))
                 sys.stdout.flush()
                 sys.stdout.write(TerminalColors.RESET)
                 sys.stdout.flush()
