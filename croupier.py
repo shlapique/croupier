@@ -16,13 +16,13 @@ token = os.environ.get("TOKEN")
 url = 'https://cloud-api.yandex.net/v1/disk/resources'
 symbs = ['◐', '◓', '◑', '◒']
 chars = itertools.cycle(symbs)
-term_cols = 72
+term_cols = os.get_terminal_size().columns
 limit = 400
 
 
 def cut_str(string, offset):
     if len(string) > offset:
-        strr = string[:offset-3] + '...'
+        strr = string[:offset-1] + '~'
         return strr
     else:
         return string
@@ -64,7 +64,6 @@ def main():
 
     # for pretty output
     n = len(str(len(items)))
-    # max_name = max(len(str(x['name'])) for x in items)
     max_size = max(len(str(human_size(x['size']))) for x in items)
     max_date = max(len(str(x['modified'])) for x in items)
     offset = term_cols - (len(str(n)) + 2 + max_size + max_date + 3)
@@ -76,7 +75,6 @@ def main():
         cards.append(card)
         long_name = cut_str(card.name, offset)
         print(f"[{str(len(cards)-1).rjust(n)}]",
-              # f"{card.name.ljust(max_name)}",
               f"{long_name.ljust(offset)}",
               f"{str(card.size).ljust(max_size)}",
               f"{card.date.ljust(max_date)}".rstrip())
