@@ -3,8 +3,12 @@ package main
 import (
 	"os"
 	"fmt"
-	// "os/signal"
+	"context"
+	"os/signal"
+	"syscall"
 	// "time"
+
+	"croupier/internal/yadisk"
 )
 
 
@@ -16,7 +20,24 @@ func getEnv(key, defaultValue string) string {
 }
 
 func main() {
-	token := getEnv("YANDEX_DISK_TOKEN", "NO_TOKEN")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	fmt.Println("TOKEN: ", token)
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	token := getEnv("YANDEX_DISK_TOKEN", "")
+	if token == "" {
+		fmt.Println("YANDEX_DISK_TOKEN env var is required!")
+		return 
+	}
+	// fmt.Printf("YANDEX_DISK_TOKEN: %s\n", token)
+
+	client := yadisk.New(token)
+	resource, err := client.GetMeta(ctx, "kindle/")
+	if err != nil {
+		fmt.Println("Error: ", err)
+	}
+	fmt.Printf("Resouce: %s\n", resource.Name)
+	fmt.Println("FULL: ", resource)
 }
