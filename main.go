@@ -8,7 +8,7 @@ import (
 	"syscall"
 	// "time"
 
-	// "croupier/internal/yadisk"
+	"croupier/internal/yadisk"
 )
 
 // type RingBuffer struct {
@@ -25,10 +25,6 @@ func getEnv(key, defaultValue string) string {
         return value
 	}
     return defaultValue
-}
-
-type Letter struct {
-	item string
 }
 
 func main() {
@@ -55,15 +51,21 @@ func main() {
 		fmt.Println("i:", i, "v:", v)
 	}
 
-// 	loader, err := yadisk.NewPreloader(numPages, 5, 2)
-// 	if err != nil {
-// 		fmt.Println("error occured:", err)
-// 	}
+	loader, err := yadisk.NewPreloader[string](numPages, 5, 2)
+	if err != nil {
+		fmt.Println("error occured:", err)
+	}
 
-	// err = loader.LoadLeft(Letter{item: "f"})
-	// if err != nil {
-	// 	fmt.Println("FUKC:", err)
-	// }
+	for _, v := range pageList {
+		err := loader.LoadRight(&v)
+		if err != nil {
+			fmt.Println("FUKC:", err)
+			break
+		}
+	}
+
+	fmt.Println("Now printing current window state...")
+	loader.ShowWindow()
 
 	// fmt.Printf("YANDEX_DISK_TOKEN: %s\n", token)
 
