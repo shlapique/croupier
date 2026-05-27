@@ -13,52 +13,6 @@ import (
 
 const baseURL = "https://cloud-api.yandex.net/v1/disk/resources"
 
-type ResourceType string
-
-const (
-	ResourceTypeFile ResourceType = "file"
-	ResourceTypeDir  ResourceType = "dir"
-)
-
-type Resource struct {
-	// Common fields for both files and folders
-	Name            string            `json:"name"`
-	Path            string            `json:"path"`
-	Created         time.Time         `json:"created"`
-	Modified        time.Time         `json:"modified"`
-	Type            ResourceType      `json:"type"`
-	
-	// Public resource fields (only present if the resource is published)
-	PublicKey       *string           `json:"public_key,omitempty"`
-	PublicURL       *string           `json:"public_url,omitempty"`
-
-	// Custom metadata (only if set via meta-add request)
-	CustomProperties map[string]string `json:"custom_properties,omitempty"` // User-defined attributes
-
-	// For folders only (present in the "_embedded" field)
-	Embedded        *ResourceList     `json:"_embedded,omitempty"`
-
-	// For files only
-	MD5             *string           `json:"md5,omitempty"`
-	MimeType        *string           `json:"mime_type,omitempty"`
-	Size            *int64            `json:"size,omitempty"`
-	Preview         *string           `json:"preview,omitempty"`
-
-	// Fields for resources in Trash
-	OriginPath      *string           `json:"origin_path,omitempty"` // Path before being moved to Trash
-}
-
-type ResourceList struct {
-	Items       []Resource `json:"items"`
-	Limit       int        `json:"limit"`
-	Offset      int        `json:"offset"`
-	Total       int        `json:"total"`
-	Path        string     `json:"path"`
-	Sort        *string    `json:"sort,omitempty"`
-	PublicKey   *string    `json:"public_key,omitempty"`
-}
-
-
 type Client struct {
 	token   string
 	http    *http.Client
