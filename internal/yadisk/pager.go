@@ -27,56 +27,98 @@ type RingBuffer[T any] struct {
 }
 
 type SlidingWindow[T any] struct {
-	rb         *RingBuffer[T]
-
-	offset     int // i.e. current page
-	maxOffset  int // i.e. max num of pages
-	windowSize int 
+	rb   *RingBuffer[T]
+	size int 
 }
 
-// Preloader and SlidingWindow have to know 
-// max number of pages
+// Fetcher receives the index and returns the data by index.
+// It should be safe to call concurrently if the preloader uses goroutines.
+type Fetcher[T any] func(index int) (T, error)
+
 type Preloader[T any] struct {
-	sw          *SlidingWindow[T]
+	sw     *SlidingWindow[T]
+	lag    int // a point (index) of SlidingWindow simmetry (or just a 'peephole')
+	fetch  Fetcher[T]
 
-	lag         int // 'peephole' index in window
-	maxNumPages int // for sw === maxOffset
+	offset    int // real 'skew' offset (index) in real data that we work with
+	maxOffset int // real maxOffset in data
 }
 
-func NewPreloader[T any](maxNumPages int, windowSize int, lag int) (*Preloader[T], error) {
+// minOffset = 0
+func getLR(offset int, maxOffset int, lag int, windowSize int) (int, int) {
+	return max(0, offset - lag), min(maxOffset, offset + (windowSize-1-lag))
+}
+
+func NewPreloader[T any](offset int, maxOffset int, windowSize int, lag int, fetcherFunc Fetcher[T]) (*Preloader[T], error) {
 	if lag < 0 || lag > (windowSize-1) {
 		fmt.Println("lag has to be insize [0, windowSize-1]")
 		return nil, errors.New("incorrect Preloader lag")
 	}
-	sw, err := NewSlidingWindow[T](windowSize, maxNumPages)
+	if maxOffset < 0 {
+		fmt.Println("maxOffset has to be insize [0, ...]")
+		return nil, errors.New("incorrect Preloader maxOffset")
+	}
+	if offset < 0 || offset > maxOffset {
+		fmt.Println("offset has to be insize [0, maxOffset]")
+		return nil, errors.New("incorrect Preloader offset")
+	}
+
+	sw, err := NewSlidingWindow[T](windowSize)
 	if err != nil {
 		fmt.Println("Unable to create NewSlidingWindow")
 		return nil, err
 	}
+
 	loader := &Preloader[T]{
-		sw:          sw,
-		lag:         lag,
-		maxNumPages: maxNumPages,
+		sw:        sw,
+		lag:       lag,
+		fetch:     fetcherFunc,
+		offset:    offset,
+		maxOffset: maxOffset,
 	}
+	
+	l, r := getLR(offset, maxOffset, lag, windowSize)
+	fmt.Println("L =", l, "R =", r)
+	data := make([]*T, r-l+1)
+	for i := l; i <= r; i++ {
+		v, err := loader.fetch(i)
+		if err != nil {
+			fmt.Println("Unable to fetch!:", err)
+			break
+		}
+		// if v == nil {
+		// 	fmt.Println("FOUND NIL (i =", i, ")")
+		// 	break
+		// }
+		fmt.Println("i:", i, "v:", v)
+		data[i-l] = &v
+	}
+	// FIXME preload task
+	// preload 0+offset'th element +
+	//   + (lag + 1 - windowSize) elements to the right
+	loader.sw.init(data)
 	return loader, nil
 }
 
-func NewSlidingWindow[T any](size int, maxOffset int) (*SlidingWindow[T], error) {
+func NewSlidingWindow[T any](size int) (*SlidingWindow[T], error) {
 	if size <= 1 {
 		fmt.Println("Are you stupid.. sliding window with size", size, "?! hell na")
 		return nil, errors.New(fmt.Sprintf("Are you stupid.. sliding window with size %d?! hell na", size))
 	}
 
-	if maxOffset <= 1 {
-		fmt.Println("Are you stupid.. maxOffset (maxNumPages) with size", maxOffset, "?! hell na")
-		return nil, errors.New(fmt.Sprintf("Are you stupid.. maxOffset (maxNumPages) with size %d?! hell na", maxOffset))
-	}
 	sw := &SlidingWindow[T]{
-		rb:         NewRingBuffer[T](size),
-		maxOffset:  maxOffset,
-		windowSize: size,
+		rb:   NewRingBuffer[T](size),
+		size: size,
 	}
 	return sw, nil
+}
+
+// some els in data may be <nil>
+func (sw *SlidingWindow[T]) init(data []*T) {
+	fmt.Println("Intiating SlidingWindow with data")
+	for _, v := range data {
+		sw.rb.add(v)
+	}
 }
 
 func NewRingBuffer[T any](capacity int) *RingBuffer[T] {
@@ -91,84 +133,47 @@ func NewRingBuffer[T any](capacity int) *RingBuffer[T] {
 
 func (sw *SlidingWindow[T]) slideLeft(el *T) error {
 	way := Left
-	if sw.offset > 0 {
-		if sw.rb.way != way {
-			err := sw.rb.changeWay(way)
-			if err != nil {
-				fmt.Println("failed to change way:", err)
-				return err
-			}
+	if sw.rb.way != way {
+		err := sw.rb.changeWay(way)
+		if err != nil {
+			fmt.Println("failed to change way:", err)
+			return err
 		}
-		sw.rb.add(el)
-		return nil
-	} else {
-		return errors.New(fmt.Sprintf("Unable to move left. Offset = %d", sw.offset))
 	}
+	sw.rb.add(el)
+	return nil
 }
 
 func (sw *SlidingWindow[T]) slideRight(el *T) error {
 	way := Right
-	if sw.offset < sw.maxOffset {
-		if sw.rb.way != way {
-			err := sw.rb.changeWay(way)
-			if err != nil {
-				fmt.Println("failed to change way:", err)
-				return err
-			}
+	if sw.rb.way != way {
+		err := sw.rb.changeWay(way)
+
+		if err != nil {
+			fmt.Println("failed to change way:", err)
+			return err
 		}
-		sw.rb.add(el)
-		return nil
-	} else {
-		return errors.New(fmt.Sprintf("Unable to move right. Offset = %d", sw.offset))
 	}
+	sw.rb.add(el)
+	return nil
 }
 
 func (loader *Preloader[T]) LoadLeft(el *T) error {
-	if loader.sw.offset <= 0 {
-		return fmt.Errorf("unable to move left: offset = %d", loader.sw.offset)
-	}
-
-	var err error
-
-	if loader.sw.offset <= loader.lag {
-		if el != nil {
-			fmt.Println("trying to preload element (page) with implicit index < 0")
-		} else {
-			fmt.Println("element == nil -> cleaning (nilling) element from window")
-		}
-		err = loader.sw.slideLeft(nil)
-	} else {
-		err = loader.sw.slideLeft(el)
-	}
-
+	err := loader.sw.slideLeft(el)
 	if err != nil {
-		fmt.Println("unable to slide left:", err)
+		fmt.Println("unable to load left:", err)
+		return err
 	}
-	return err
+	return nil
 }
 
 func (loader *Preloader[T]) LoadRight(el *T) error {
-	if loader.sw.offset >= loader.maxNumPages-1 {
-		return fmt.Errorf("unable to move right: offset = %d", loader.sw.offset)
-	}
-
-	var err error
-
-	if loader.sw.offset >= (loader.maxNumPages-1-loader.lag) {
-		if el != nil {
-			fmt.Println("trying to preload element (page) with implicit index > maxNumPages-1")
-		} else {
-			fmt.Println("element == nil -> cleaning (nilling) element from window")
-		}
-		err = loader.sw.slideRight(nil)
-	} else {
-		err = loader.sw.slideRight(el)
-	}
-
+	err := loader.sw.slideRight(el)
 	if err != nil {
-		fmt.Println("unable to slide right:", err)
+		fmt.Println("unable to load right:", err)
+		return err
 	}
-	return err
+	return nil
 }
 
 func (loader *Preloader[T]) ShowWindow() {
@@ -190,9 +195,11 @@ func (rb *RingBuffer[T]) changeWay(newWay Way) error {
 		switch newWay {
 		case Left:
 			rb.ht = (rb.ht  + rb.capacity - 1) % rb.capacity
+			rb.way = newWay
 			return nil
 		case Right:
 			rb.ht = (rb.ht + 1) % rb.capacity
+			rb.way = newWay
 			return nil
 		default:
 			return errors.New(fmt.Sprintf("unable to determine way: %v", newWay))
@@ -208,18 +215,14 @@ func (rb *RingBuffer[T]) add(el *T) {
 	rb.buffer[rb.ht] = el 
 	switch rb.way {
 	case Left:
-		rb.ht = (rb.ht  + rb.capacity - 1) % rb.capacity
+		rb.ht = (rb.ht + rb.capacity - 1) % rb.capacity
 	case Right:
 		rb.ht = (rb.ht + 1) % rb.capacity
 	}
-	fmt.Println("element:", el, "added!")
+	if el == nil {
+		fmt.Println("element:", el, "added!")
+	} else {
+		fmt.Println("element:", *el, "added!")
+	}
 	fmt.Println("New ht index:", rb.ht)
 }
-
-// func (rb *RingBuffer) get()
-
-// type Pager struct {
-// 	client *Client
-// 	path   string
-// 	limit  int
-// }

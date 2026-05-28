@@ -6,6 +6,7 @@ import (
 	// "context"
 	"os/signal"
 	"syscall"
+	// "bufio"
 	// "time"
 
 	"croupier/internal/yadisk"
@@ -51,21 +52,52 @@ func main() {
 		fmt.Println("i:", i, "v:", v)
 	}
 
-	loader, err := yadisk.NewPreloader[string](numPages, 5, 2)
+	loader, err := yadisk.NewPreloader[string](
+		13,
+		14,
+		5,
+		0,
+		func(i int) (string, error) { return pageList[i], nil },
+	)
 	if err != nil {
-		fmt.Println("error occured:", err)
-	}
-
-	for _, v := range pageList {
-		err := loader.LoadRight(&v)
-		if err != nil {
-			fmt.Println("FUKC:", err)
-			break
-		}
+		fmt.Println("Unable to create New Loader:", err)
 	}
 
 	fmt.Println("Now printing current window state...")
 	loader.ShowWindow()
+
+	// // 
+	// scanner := bufio.NewScanner(os.Stdin)
+    // fmt.Println("Enter lines (Ctrl+D to end):")
+	// curPage := 0
+	// err = loader.LoadRight(&pageList[0])
+	// if err != nil {
+	// 	fmt.Println("EROR")
+	// }
+    // for scanner.Scan() {
+	// 	switch scanner.Text() {
+	// 	case "r":
+	// 		err = loader.LoadRight(&pageList[curPage])
+	// 		if err != nil {
+	// 			fmt.Println("EROR in cycle!")
+	// 			break
+	// 		} else {
+	// 			curPage += 1
+	// 		}
+	// 	case "l":
+	// 		err = loader.LoadLeft(&pageList[curPage])
+	// 		if err != nil {
+	// 			fmt.Println("EROR in cycle!")
+	// 			break
+	// 		} else {
+	// 			curPage -= 1
+	// 		}
+	// 	}
+	// 	loader.ShowWindow()
+    // }
+    // if err := scanner.Err(); err != nil {
+        // fmt.Fprintln(os.Stderr, "error:", err)
+    // }
 
 	// fmt.Printf("YANDEX_DISK_TOKEN: %s\n", token)
 
