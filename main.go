@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"fmt"
-	// "context"
+	"context"
 	"os/signal"
 	"syscall"
 	"bufio"
@@ -13,15 +13,6 @@ import (
 	"croupier/internal/preloader"
 )
 
-// type RingBuffer struct {
-// 	Buffer []string
-
-// 	Head   *string
-// 	Tail   *string
-// 	Size   int
-// }
-
-
 func getEnv(key, defaultValue string) string {
     if value := os.Getenv(key); value != "" {
         return value
@@ -30,8 +21,8 @@ func getEnv(key, defaultValue string) string {
 }
 
 func main() {
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -53,20 +44,23 @@ func main() {
 		fmt.Println("i:", i, "v:", v)
 	}
 
-	startPage := 0
-	minOffset := 0
-	maxOffset := 14
-	windowSize := 5
-	lag := 2
+	// create and init preloader
+	loader, err := preloader.New[string](ctx, preloader.Config[string]{
+		Offset:    0,
+		MinOffset: 0,
+		MaxOffset: 14,
+		Size:      5,
+		Lag:       2,
+		FetchFunc: func(i int) (string, error) { 
+			if i >= 0 && i <= 14 { 
+				return pageList[i], nil 
+			} else { 
+				return "", errors.New("i is out of bounds!") 
+			} 
+		},
+		WorkersNum: 2,
+	})
 
-	loader, err := preloader.NewPreloader[string](
-		startPage,
-		minOffset,
-		maxOffset,
-		windowSize,
-		lag,
-		func(i int, l int, r int) (string, error) { if i >= l && i <= r { return pageList[i], nil } else { return "", errors.New("i is out of bounds!") } },
-	)
 	if err != nil {
 		fmt.Println("Unable to create New Loader:", err)
 	}
@@ -74,9 +68,9 @@ func main() {
 	fmt.Println("Now printing current window state...")
 	loader.Sw.Show()
 
+	// user loop
 	scanner := bufio.NewScanner(os.Stdin)
     fmt.Println("Enter lines (Ctrl+D to end):")
-	curPage := startPage
     for scanner.Scan() {
 		switch scanner.Text() {
 		case "r":
@@ -84,19 +78,16 @@ func main() {
 			if err != nil {
 				fmt.Println("EROR in cycle!")
 				break
-			} else {
-				curPage += 1
 			}
 		case "l":
 			err = loader.LoadLeft()
 			if err != nil {
 				fmt.Println("EROR in cycle!")
 				break
-			} else {
-				curPage -= 1
 			}
+		case "s":
+			loader.Sw.Show()
 		}
-		loader.Sw.Show()
     }
     if err := scanner.Err(); err != nil {
         fmt.Fprintln(os.Stderr, "error:", err)

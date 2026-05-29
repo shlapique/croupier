@@ -12,7 +12,7 @@ type SlidingWindow[T any] struct {
 	Size int 
 }
 
-func NewSlidingWindow[T any](size int) (*SlidingWindow[T], error) {
+func New[T any](size int) (*SlidingWindow[T], error) {
 	if size <= 1 {
 		fmt.Println("Are you stupid.. sliding window with size", size, "?! hell na")
 		return nil, errors.New(fmt.Sprintf("Are you stupid.. sliding window with size %d?! hell na", size))
