@@ -9,7 +9,7 @@ import (
 
 type SlidingWindow[T any] struct {
 	rb   *ringBuffer[T]
-	size int 
+	Size int 
 }
 
 func NewSlidingWindow[T any](size int) (*SlidingWindow[T], error) {
@@ -20,7 +20,7 @@ func NewSlidingWindow[T any](size int) (*SlidingWindow[T], error) {
 
 	sw := &SlidingWindow[T]{
 		rb:   newRingBuffer[T](size),
-		size: size,
+		Size: size,
 	}
 	return sw, nil
 }

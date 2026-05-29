@@ -6,8 +6,9 @@ import (
 	// "context"
 	"os/signal"
 	"syscall"
-	// "bufio"
+	"bufio"
 	// "time"
+	"errors"
 
 	"croupier/internal/preloader"
 )
@@ -52,12 +53,19 @@ func main() {
 		fmt.Println("i:", i, "v:", v)
 	}
 
+	startPage := 0
+	minOffset := 0
+	maxOffset := 14
+	windowSize := 5
+	lag := 2
+
 	loader, err := preloader.NewPreloader[string](
-		1,
-		14,
-		5,
-		2,
-		func(i int) (string, error) { return pageList[i], nil },
+		startPage,
+		minOffset,
+		maxOffset,
+		windowSize,
+		lag,
+		func(i int, l int, r int) (string, error) { if i >= l && i <= r { return pageList[i], nil } else { return "", errors.New("i is out of bounds!") } },
 	)
 	if err != nil {
 		fmt.Println("Unable to create New Loader:", err)
@@ -66,38 +74,33 @@ func main() {
 	fmt.Println("Now printing current window state...")
 	loader.Sw.Show()
 
-	// // 
-	// scanner := bufio.NewScanner(os.Stdin)
-    // fmt.Println("Enter lines (Ctrl+D to end):")
-	// curPage := 0
-	// err = loader.LoadRight(&pageList[0])
-	// if err != nil {
-	// 	fmt.Println("EROR")
-	// }
-    // for scanner.Scan() {
-	// 	switch scanner.Text() {
-	// 	case "r":
-	// 		err = loader.LoadRight(&pageList[curPage])
-	// 		if err != nil {
-	// 			fmt.Println("EROR in cycle!")
-	// 			break
-	// 		} else {
-	// 			curPage += 1
-	// 		}
-	// 	case "l":
-	// 		err = loader.LoadLeft(&pageList[curPage])
-	// 		if err != nil {
-	// 			fmt.Println("EROR in cycle!")
-	// 			break
-	// 		} else {
-	// 			curPage -= 1
-	// 		}
-	// 	}
-	// 	loader.ShowWindow()
-    // }
-    // if err := scanner.Err(); err != nil {
-        // fmt.Fprintln(os.Stderr, "error:", err)
-    // }
+	scanner := bufio.NewScanner(os.Stdin)
+    fmt.Println("Enter lines (Ctrl+D to end):")
+	curPage := startPage
+    for scanner.Scan() {
+		switch scanner.Text() {
+		case "r":
+			err = loader.LoadRight()
+			if err != nil {
+				fmt.Println("EROR in cycle!")
+				break
+			} else {
+				curPage += 1
+			}
+		case "l":
+			err = loader.LoadLeft()
+			if err != nil {
+				fmt.Println("EROR in cycle!")
+				break
+			} else {
+				curPage -= 1
+			}
+		}
+		loader.Sw.Show()
+    }
+    if err := scanner.Err(); err != nil {
+        fmt.Fprintln(os.Stderr, "error:", err)
+    }
 
 	// fmt.Printf("YANDEX_DISK_TOKEN: %s\n", token)
 
