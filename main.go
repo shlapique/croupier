@@ -9,7 +9,7 @@ import (
 	// "bufio"
 	// "time"
 
-	"croupier/internal/yadisk"
+	"croupier/internal/preloader"
 )
 
 // type RingBuffer struct {
@@ -52,11 +52,11 @@ func main() {
 		fmt.Println("i:", i, "v:", v)
 	}
 
-	loader, err := yadisk.NewPreloader[string](
-		13,
+	loader, err := preloader.NewPreloader[string](
+		1,
 		14,
 		5,
-		0,
+		2,
 		func(i int) (string, error) { return pageList[i], nil },
 	)
 	if err != nil {
@@ -64,7 +64,7 @@ func main() {
 	}
 
 	fmt.Println("Now printing current window state...")
-	loader.ShowWindow()
+	loader.Sw.Show()
 
 	// // 
 	// scanner := bufio.NewScanner(os.Stdin)
