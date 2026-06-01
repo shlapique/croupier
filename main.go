@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 	"bufio"
-	// "time"
+	"time"
 	"errors"
 
 	"croupier/internal/preloader"
@@ -32,6 +32,11 @@ func main() {
 		fmt.Println("YANDEX_DISK_TOKEN env var is required!")
 		return 
 	}
+
+	debug := getEnv("DEBUG", "0")
+	if debug == "1" {
+		fmt.Println("DEBUG mode enabled")
+	}
 	
 	const numPages = 15
 	var pageList [numPages]string
@@ -53,6 +58,7 @@ func main() {
 		Lag:       2,
 		FetchFunc: func(i int) (string, error) { 
 			if i >= 0 && i <= 14 { 
+				time.Sleep(5*time.Second)
 				return pageList[i], nil 
 			} else { 
 				return "", errors.New("i is out of bounds!") 

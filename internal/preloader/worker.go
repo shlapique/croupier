@@ -2,7 +2,9 @@ package preloader
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 )
 
 type Worker[T any] struct {
@@ -19,6 +21,11 @@ type Worker[T any] struct {
 
 	Busy bool
 	// mu 
+}
+
+type fetchResult[T any] struct {
+	v   T
+	err error
 }
 
 func newWorker[T any](id int, jobChan chan *Job[T], fetchFunc Fetcher[T]) *Worker[T] {
@@ -46,7 +53,8 @@ func (w *Worker[T]) run(ctx context.Context) {
 			fmt.Printf("worker %d got new job: %d\n", w.id, job.offset)
 
 			// get the item from data and assign where it belongs to
-			v, err := w.fetch(job.offset)
+			// v, err := w.fetch(job.offset)
+			v, err := w.timeoutFetch(ctx, job.offset)
 			if err != nil {
 				fmt.Println("Unable to fetch!:", err)
 				break
@@ -58,5 +66,31 @@ func (w *Worker[T]) run(ctx context.Context) {
 		case offsetToKill := <-w.ctrl:
 			fmt.Printf("worker %d got ctrl offset (to kill): %d\n", w.id, offsetToKill)
 		}
+	}
+}
+
+// set a timeout for fetch ALL opearations (e.g. 15s) -- sane
+// fetch itself may have timeout too
+// FIXME remove hardcoded 15 value
+func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (T, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	// to return nil
+	var zero T
+
+	result := make(chan fetchResult[T], 1)
+
+	go func() {
+		v, err := w.fetch(i)
+		result <- fetchResult[T]{v: v, err: err}
+	}()
+
+	select {
+	case r := <- result:
+		return r.v, r.err
+	case <-ctx.Done():
+		fmt.Println("Timeout [15s] for 'timeoutFetch' function exceeded!")
+		return zero, errors.New("Timeout [15s] for 'timeoutFetch' function exceeded!")
 	}
 }
