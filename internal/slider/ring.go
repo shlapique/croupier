@@ -62,10 +62,5 @@ func (rb *ringBuffer[T]) add(el *T) {
 	case Right:
 		rb.ht = (rb.ht + 1) % rb.capacity
 	}
-	if el == nil {
-		fmt.Println("element:", el, "added!")
-	} else {
-		fmt.Println("element:", *el, "added!")
-	}
 	fmt.Println("New ht index:", rb.ht)
 }

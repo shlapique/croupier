@@ -45,7 +45,7 @@ type Config[T any] struct {
 }
 
 func getLR(offset int, minOffset int, maxOffset int, lag int, windowSize int) (int, int) {
-	return max(0, offset - lag), min(maxOffset, offset + (windowSize-1-lag))
+	return max(minOffset, offset - lag), min(maxOffset, offset + (windowSize-1-lag))
 }
 
 func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
@@ -70,7 +70,7 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 
 	workers := make([]*Worker[T], config.WorkersNum)
 	// FIXME add jobs chan size param
-	jobChan := make(chan *Job[T], 10)
+	jobChan := make(chan *Job[T], 100)
 	// create workers
 	for i := range config.WorkersNum {
 		var w = newWorker[T](i, jobChan, config.FetchFunc)
@@ -110,6 +110,19 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 	return loader, nil
 }
 
+func (loader *Preloader[T]) killJob(offsetIndex int) {
+	for _, w := range loader.workers {
+		if w.Busy && w.Offset == offsetIndex {
+			fmt.Printf("Found Busy worker [%d] with offset [%d]!\n", w.Id, w.Offset)
+			fmt.Printf("Sending offsetIndex to kill [%d]\n", offsetIndex)
+			w.Ctrl <-offsetIndex
+			return
+		}
+	}
+	fmt.Printf("There's no workers with Offset [%d] and status Busy\n", offsetIndex)
+	return 
+}
+
 func (loader *Preloader[T]) LoadLeft() error {
 	if loader.offset == loader.minOffset {
 		fmt.Printf("Unable to move more left then minOffset [%d], current offset [%d]\n", loader.minOffset, loader.offset)
@@ -124,7 +137,14 @@ func (loader *Preloader[T]) LoadLeft() error {
 			return err
 		}
 	} else {
-		idx := loader.offset - loader.lag - 1
+		// calc new index
+		l, r := getLR(loader.offset, loader.minOffset, loader.maxOffset, loader.lag, loader.Sw.Size)
+		idx := l - 1
+
+		// cancel oldest (right) job
+		loader.killJob(r)
+
+		// assign new job
 		v := new(T)
 		job := Job[T]{v, idx}
 		loader.jobChan <-&job
@@ -153,7 +173,14 @@ func (loader *Preloader[T]) LoadRight() error {
 			return err
 		}
 	} else {
-		idx := loader.offset + loader.Sw.Size - loader.lag 
+		// calc new index
+		l, r := getLR(loader.offset, loader.minOffset, loader.maxOffset, loader.lag, loader.Sw.Size)
+		idx := r + 1 
+
+		// cancel oldest (left) job
+		loader.killJob(l)
+
+		// assign new job
 		v := new(T)
 		job := Job[T]{v, idx}
 		loader.jobChan <-&job

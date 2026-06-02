@@ -8,11 +8,11 @@ import (
 )
 
 type Worker[T any] struct {
-	id   int
+	Id   int
 	Offset int // current job.offset (if busy == true)
 
 	jobs chan *Job[T]
-	ctrl chan int  // offsets to kill
+	Ctrl chan int  // offsets to kill
 
 	minOffset int
 	maxOffset int
@@ -30,41 +30,44 @@ type fetchResult[T any] struct {
 
 func newWorker[T any](id int, jobChan chan *Job[T], fetchFunc Fetcher[T]) *Worker[T] {
 	return &Worker[T]{
-		id:   id,
+		Id:   id,
 		jobs: jobChan,
-		ctrl: make(chan int, 10),
+		Ctrl: make(chan int, 100),
 		fetch: fetchFunc,
 	}
 }
 
 func (w *Worker[T]) run(ctx context.Context) {
-	fmt.Printf("worker %d is running\n", w.id)
+	fmt.Printf("[worker %d] running\n", w.Id)
+	defer close(w.Ctrl)
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("worker %d killed\n", w.id)
+			fmt.Printf("[worker %d] killed\n", w.Id)
 			return
 		case job, ok := <-w.jobs:
 			if !ok {
-				fmt.Printf("worker %d: jobChan closed!\n", w.id)
+				fmt.Printf("[worker %d] jobChan closed!\n", w.Id)
 				return
 			}
-			fmt.Printf("worker %d got new job: %d\n", w.id, job.offset)
+			fmt.Printf("[worker %d] got new job: %d\n", w.Id, job.offset)
 
 			// get the item from data and assign where it belongs to
-			// v, err := w.fetch(job.offset)
+			w.Busy = true
+			w.Offset = job.offset
 			v, err := w.timeoutFetch(ctx, job.offset)
 			if err != nil {
-				fmt.Println("Unable to fetch!:", err)
+				fmt.Printf("[worker %d] Unable to fetch!: %v\n", w.Id, err)
+				w.Busy = false
 				break
 			}
-			fmt.Printf("worker %d got item: %s\n", w.id, v)
-			fmt.Printf("worker %d, current v addr %v\n", w.id, &v)
+			fmt.Printf("[worker %d] got item: %s!\n", w.Id, v)
 			*job.el = v
+			w.Busy = false
 
-		case offsetToKill := <-w.ctrl:
-			fmt.Printf("worker %d got ctrl offset (to kill): %d\n", w.id, offsetToKill)
+		case offsetToKill := <-w.Ctrl:
+			fmt.Printf("[worker %d] got ctrl offset (to kill): %d\n", w.Id, offsetToKill)
 		}
 	}
 }
@@ -76,12 +79,13 @@ func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (T, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	// to return nil
+	// to return nil obj
 	var zero T
 
 	result := make(chan fetchResult[T], 1)
 
 	go func() {
+		fmt.Printf("[worker %d] Fetching %d ...\n", w.Id, i)
 		v, err := w.fetch(i)
 		result <- fetchResult[T]{v: v, err: err}
 	}()
@@ -89,8 +93,13 @@ func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (T, error) {
 	select {
 	case r := <- result:
 		return r.v, r.err
+
+	case indexToKill := <-w.Ctrl:
+		fmt.Printf("[worker %d] job %d cancelled!\n", w.Id, indexToKill)
+		return zero, nil
+
 	case <-ctx.Done():
-		fmt.Println("Timeout [15s] for 'timeoutFetch' function exceeded!")
-		return zero, errors.New("Timeout [15s] for 'timeoutFetch' function exceeded!")
+		fmt.Printf("[worker %d] Timeout [15s] for 'timeoutFetch' function exceeded!\n", w.Id)
+		return zero, errors.New(fmt.Sprintf("[worker %d] Timeout [15s] for 'timeoutFetch' function exceeded!\n", w.Id))
 	}
 }
