@@ -1,7 +1,7 @@
 # croupier tool🃏
 This tool offers files for downloading from disk
 
-It has prealoding feature with Sliding Window (RingBuffer cache).
+It has prealoding feature with Sliding Window (RingBuffer cache)
 
 ![](pics/pic.svg)
 

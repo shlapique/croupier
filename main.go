@@ -7,10 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 	"bufio"
-	"time"
+	// "time"
 	"errors"
 
 	"croupier/internal/preloader"
+	"croupier/internal/yadisk"
 )
 
 func getEnv(key, defaultValue string) string {
@@ -38,34 +39,63 @@ func main() {
 		fmt.Println("DEBUG mode enabled")
 	}
 	
-	const numPages = 15
-	var pageList [numPages]string
-	for i := range pageList {
-		pageList[i] = string('A' + rune(i))
+	// const numPages = 15
+	// var pageList [numPages]string
+	// for i := range pageList {
+	// 	pageList[i] = string('A' + rune(i))
+	// }
+
+	// fmt.Println("Now printing...")
+	// for i, v := range pageList {
+	// 	fmt.Println("i:", i, "v:", v)
+	// }
+
+	// yaclient
+	// we need to spec num of items per page
+	// => limit 
+	pageSize := 20
+	path := "disk:/kindle/"
+	client := yadisk.New(yadisk.Config{
+		Token: token,
+		Timeout: 15,
+	})
+	meta, err := client.GetMeta(ctx, path, pageSize, 0)
+	if err != nil {
+		fmt.Println("Error: ", err)
 	}
 
-	fmt.Println("Now printing...")
-	for i, v := range pageList {
-		fmt.Println("i:", i, "v:", v)
+	fmt.Printf("Name: %s\n", meta.Name)
+	fmt.Println("Meta: ", meta)
+	if meta.Type == "dir" {
+		fmt.Println("Its a dir:", meta.Name, "at path:", meta.Path, "!")
+		fmt.Println("Embed FULL: ", *meta.Embedded)
+	}
+
+	total := meta.Embedded.Total
+	maxOffset := total / pageSize
+	fmt.Printf("total [%d], pageSize [%d], maxOffset [%d]\n", total, pageSize, maxOffset)
+
+	pConfig := preloader.Config[yadisk.Page]{
+		Offset:    0,
+		MinOffset: 0,
+		MaxOffset: maxOffset,
+		Size:      3,
+		Lag:       1,
+		FetchFunc: func(i int) (yadisk.Page, error) { 
+			if i >= 0 && i <= maxOffset { 
+				resp, err := client.GetMeta(ctx, path, pageSize, i*pageSize)
+				embArray := &resp.Embedded.Items
+				page := yadisk.Page{ Names: yadisk.MapNames[yadisk.Resource](embArray, func(r yadisk.Resource) string { return r.Name }) }
+				return page, err
+			} else { 
+				return yadisk.Page{}, errors.New("i is out of bounds!") 
+			}
+		},
+		WorkersNum: 2, 
 	}
 
 	// create and init preloader
-	loader, err := preloader.New[string](ctx, preloader.Config[string]{
-		Offset:    0,
-		MinOffset: 0,
-		MaxOffset: 14,
-		Size:      5,
-		Lag:       2,
-		FetchFunc: func(i int) (string, error) { 
-			if i >= 0 && i <= 14 { 
-				time.Sleep(5*time.Second)
-				return pageList[i], nil 
-			} else { 
-				return "", errors.New("i is out of bounds!") 
-			}
-		},
-		WorkersNum: 2,
-	})
+	loader, err := preloader.New[yadisk.Page](ctx, pConfig)
 
 	if err != nil {
 		fmt.Println("Unable to create New Loader:", err)
@@ -73,6 +103,7 @@ func main() {
 
 	fmt.Println("Now printing current window state...")
 	loader.Sw.Show()
+
 
 	// user loop
 	scanner := bufio.NewScanner(os.Stdin)
@@ -98,19 +129,4 @@ func main() {
     if err := scanner.Err(); err != nil {
         fmt.Fprintln(os.Stderr, "error:", err)
     }
-
-	// fmt.Printf("YANDEX_DISK_TOKEN: %s\n", token)
-
-	// client := yadisk.New(token)
-	// meta, err := client.GetMeta(ctx, "disk:/kindle/67.apk")
-	// if err != nil {
-	// 	fmt.Println("Error: ", err)
-	// }
-
-	// fmt.Printf("Name: %s\n", meta.Name)
-	// fmt.Println("Meta: ", meta)
-	// if meta.Type == "dir" {
-	// 	fmt.Println("Its a dir:", meta.Name, "at path:", meta.Path, "!")
-	// 	fmt.Println("Embed FULL: ", *meta.Embedded)
-	// }
 }

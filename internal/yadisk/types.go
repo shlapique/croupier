@@ -40,3 +40,7 @@ type ResourceList struct {
 	Sort        *string    `json:"sort,omitempty"`
 	PublicKey   *string    `json:"public_key,omitempty"`
 }
+
+type Page struct {
+	Names []string
+}

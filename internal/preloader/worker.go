@@ -24,7 +24,7 @@ type Worker[T any] struct {
 }
 
 type fetchResult[T any] struct {
-	v   T
+	v   *T
 	err error
 }
 
@@ -62,8 +62,8 @@ func (w *Worker[T]) run(ctx context.Context) {
 				w.Busy = false
 				break
 			}
-			fmt.Printf("[worker %d] got item: %s!\n", w.Id, v)
-			*job.el = v
+			fmt.Printf("[worker %d] got item: %s!\n", w.Id, *v)
+			*job.el = *v
 			w.Busy = false
 
 		case offsetToKill := <-w.Ctrl:
@@ -75,19 +75,16 @@ func (w *Worker[T]) run(ctx context.Context) {
 // set a timeout for fetch ALL opearations (e.g. 15s) -- sane
 // fetch itself may have timeout too
 // FIXME remove hardcoded 15 value
-func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (T, error) {
+func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (*T, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-
-	// to return nil obj
-	var zero T
 
 	result := make(chan fetchResult[T], 1)
 
 	go func() {
 		fmt.Printf("[worker %d] Fetching %d ...\n", w.Id, i)
 		v, err := w.fetch(i)
-		result <- fetchResult[T]{v: v, err: err}
+		result <- fetchResult[T]{v: &v, err: err}
 	}()
 
 	select {
@@ -96,10 +93,10 @@ func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (T, error) {
 
 	case indexToKill := <-w.Ctrl:
 		fmt.Printf("[worker %d] job %d cancelled!\n", w.Id, indexToKill)
-		return zero, nil
+		return nil, nil
 
 	case <-ctx.Done():
 		fmt.Printf("[worker %d] Timeout [15s] for 'timeoutFetch' function exceeded!\n", w.Id)
-		return zero, errors.New(fmt.Sprintf("[worker %d] Timeout [15s] for 'timeoutFetch' function exceeded!\n", w.Id))
+		return nil, errors.New(fmt.Sprintf("[worker %d] Timeout [15s] for 'timeoutFetch' function exceeded!\n", w.Id))
 	}
 }
