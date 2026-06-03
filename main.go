@@ -62,7 +62,7 @@ func main() {
 				return pageList[i], nil 
 			} else { 
 				return "", errors.New("i is out of bounds!") 
-			} 
+			}
 		},
 		WorkersNum: 2,
 	})
