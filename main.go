@@ -147,7 +147,15 @@ func main() {
 					fmt.Println("Unable to get Donwload link!")
 					break
 				}
-				fmt.Printf("RESPONCE: %v\n", resp)
+				fmt.Printf("LINK TO DOWNLOAD [%s]\n", resp.Href)
+				pth := "./tmp/" + firstFile.Name
+				fmt.Printf("Trying to download file to filepath [%s]\n", pth)
+				err = client.DownloadFile(ctx, pth, resp.Href)
+				if err != nil {
+					fmt.Println("Unable to download!")
+					break
+				}
+				fmt.Println("DONE")
 			}
 		}
     }

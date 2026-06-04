@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"net/url"
 	"encoding/json"
-	// "os"
+	"os"
 	"context"
 	// "os/signal"
 	"time"
 	"strconv"
+	"io"
 )
 
 const baseURL = "https://cloud-api.yandex.net/v1/disk/resources"
@@ -75,6 +76,15 @@ func (c *Client) GetMeta(ctx context.Context, path string, limit int, offset int
 	return &resource, nil
 }
 
+// map: Resource array -> Resource Subset Struct
+func MapSubset[T any, U any](items *[]T, f func(T) U) []U {
+	out := make([]U, 0, len(*items))
+	for _, item := range *items {
+		out = append(out, f(item))
+	}
+	return out
+}
+
 // returns href to direct download with smth like curl
 func (c *Client) GetDownloadLink(ctx context.Context, path string) (*GetLinkResponse, error) {
 	fmt.Printf("Trying to get download link to a file [%s]\n", path)
@@ -109,11 +119,30 @@ func (c *Client) GetDownloadLink(ctx context.Context, path string) (*GetLinkResp
 	return &getLinkResponse, nil
 }
 
-// map: Resource array -> Resource Subset Struct
-func MapSubset[T any, U any](items *[]T, f func(T) U) []U {
-	out := make([]U, 0, len(*items))
-	for _, item := range *items {
-		out = append(out, f(item))
+// no Auth needed
+func (c *Client) DownloadFile(ctx context.Context, filePath string, link string) error {
+	out, err := os.Create(filePath)
+	if err != nil {
+		fmt.Printf("Unable to create file [%s]\n", filePath)
+		return err
 	}
-	return out
+	defer out.Close()
+
+	resp, err := http.Get(link)
+	if err != nil {
+		fmt.Printf("Unable to get link [%s]\n", link)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Errorf("bad status: %s", resp.Status)
+		return err
+	}
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		fmt.Printf("Unable to write into file [%s]\n", filePath)
+		return err
+	}
+	return nil
 }
