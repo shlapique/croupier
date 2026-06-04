@@ -3,20 +3,20 @@ package slider
 import (
 	// "context"
 	// "sync"
-	"fmt"
 	"errors"
+	"fmt"
 )
 
 // two-wise 'overwriting' buffer without 'del' cmd
 type ringBuffer[T any] struct {
-	buffer   []*T
+	buffer []*T
 
-	ht       int // stands for "head-tail"
+	ht int // stands for "head-tail"
 
 	count    int
 	capacity int
 
-	way       Way // current 'way' of moving
+	way Way // current 'way' of moving
 }
 
 func newRingBuffer[T any](capacity int) *ringBuffer[T] {
@@ -31,13 +31,13 @@ func newRingBuffer[T any](capacity int) *ringBuffer[T] {
 
 // moves tail one step forward newWay
 // newWay == Left -> move h;t 1 step left
-// newWay == Right -> move h;t 1 step right 
+// newWay == Right -> move h;t 1 step right
 func (rb *ringBuffer[T]) changeWay(newWay Way) error {
 	// krol jump to the opposite direction on 1 step
 	if rb.way != newWay {
 		switch newWay {
 		case Left:
-			rb.ht = (rb.ht  + rb.capacity - 1) % rb.capacity
+			rb.ht = (rb.ht + rb.capacity - 1) % rb.capacity
 			rb.way = newWay
 			return nil
 		case Right:
@@ -46,7 +46,7 @@ func (rb *ringBuffer[T]) changeWay(newWay Way) error {
 			return nil
 		default:
 			return errors.New(fmt.Sprintf("unable to determine way: %v", newWay))
-		} 
+		}
 	} else {
 		fmt.Println("current buffer way:", rb.way)
 		fmt.Println("new way:", newWay, "-> nothing to do")
@@ -55,7 +55,7 @@ func (rb *ringBuffer[T]) changeWay(newWay Way) error {
 }
 
 func (rb *ringBuffer[T]) add(el *T) {
-	rb.buffer[rb.ht] = el 
+	rb.buffer[rb.ht] = el
 	switch rb.way {
 	case Left:
 		rb.ht = (rb.ht + rb.capacity - 1) % rb.capacity

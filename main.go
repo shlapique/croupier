@@ -1,24 +1,24 @@
 package main
 
 import (
-	"os"
-	"fmt"
+	"bufio"
 	"context"
+	"errors"
+	"fmt"
+	"os"
 	"os/signal"
 	"syscall"
-	"bufio"
 	"time"
-	"errors"
 
 	"croupier/internal/preloader"
 	"croupier/internal/yadisk"
 )
 
 func getEnv(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {
-        return value
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
-    return defaultValue
+	return defaultValue
 }
 
 func main() {
@@ -31,34 +31,24 @@ func main() {
 	token := getEnv("YANDEX_DISK_TOKEN", "")
 	if token == "" {
 		fmt.Println("YANDEX_DISK_TOKEN env var is required!")
-		return 
+		return
 	}
 
 	debug := getEnv("DEBUG", "0")
 	if debug == "1" {
 		fmt.Println("DEBUG mode enabled")
 	}
-	
-	// const numPages = 15
-	// var pageList [numPages]string
-	// for i := range pageList {
-	// 	pageList[i] = string('A' + rune(i))
-	// }
-
-	// fmt.Println("Now printing...")
-	// for i, v := range pageList {
-	// 	fmt.Println("i:", i, "v:", v)
-	// }
 
 	// yaclient
 	// we need to spec num of items per page
-	// => limit 
+	// => limit
 	pageSize := 5
 	path := "disk:/kindle/"
 	client := yadisk.New(yadisk.Config{
-		Token: token,
+		Token:   token,
 		Timeout: 15,
 	})
+	// get inital info about folder
 	meta, err := client.GetMeta(ctx, path, pageSize, 0)
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -69,6 +59,9 @@ func main() {
 	if meta.Type == "dir" {
 		fmt.Println("Its a dir:", meta.Name, "at path:", meta.Path, "!")
 		fmt.Println("Embed FULL: ", *meta.Embedded)
+	} else {
+		fmt.Println("ITS NOT A DIR!")
+		return
 	}
 
 	total := meta.Embedded.Total
@@ -81,20 +74,20 @@ func main() {
 		MaxOffset: maxOffset,
 		Size:      5,
 		Lag:       4,
-		FetchFunc: func(i int) (yadisk.Page, error) { 
-			if i >= 0 && i <= maxOffset { 
+		FetchFunc: func(i int) (yadisk.Page, error) {
+			if i >= 0 && i <= maxOffset {
 				// TODO
 				time.Sleep(1)
 				resp, err := client.GetMeta(ctx, path, pageSize, i*pageSize)
 				// items array
 				embArray := &resp.Embedded.Items
-				page := yadisk.Page{ Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File { return yadisk.File{ Name: r.Name, Path: r.Path } } ) }
+				page := yadisk.Page{Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File { return yadisk.File{Name: r.Name, Path: r.Path} })}
 				return page, err
-			} else { 
-				return yadisk.Page{}, errors.New("i is out of bounds!") 
+			} else {
+				return yadisk.Page{}, errors.New("i is out of bounds!")
 			}
 		},
-		WorkersNum: 2, 
+		WorkersNum: 2,
 	}
 
 	// create and init preloader
@@ -109,8 +102,8 @@ func main() {
 
 	// user loop
 	scanner := bufio.NewScanner(os.Stdin)
-    fmt.Println("Enter lines (Ctrl+D to end):")
-    for scanner.Scan() {
+	fmt.Println("Enter lines (Ctrl+D to end):")
+	for scanner.Scan() {
 		switch scanner.Text() {
 		case "r":
 			err = loader.LoadRight()
@@ -158,8 +151,8 @@ func main() {
 				fmt.Println("DONE")
 			}
 		}
-    }
-    if err := scanner.Err(); err != nil {
-        fmt.Fprintln(os.Stderr, "error:", err)
-    }
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+	}
 }

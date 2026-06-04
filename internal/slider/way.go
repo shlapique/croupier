@@ -1,4 +1,4 @@
-package slider 
+package slider
 
 type Way int
 

@@ -1,16 +1,16 @@
 package yadisk
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"encoding/json"
 	"os"
-	"context"
 	// "os/signal"
-	"time"
-	"strconv"
 	"io"
+	"strconv"
+	"time"
 )
 
 const baseURL = "https://cloud-api.yandex.net/v1/disk/resources"
@@ -22,7 +22,7 @@ type Client struct {
 }
 
 type Config struct {
-	Token string
+	Token   string
 	Timeout time.Duration
 }
 
@@ -63,10 +63,10 @@ func (c *Client) GetMeta(ctx context.Context, path string, limit int, offset int
 	req.Header.Set("Authorization", "OAuth "+c.token)
 
 	resp, err := c.http.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("do request: %w", err)
-    }
-    defer resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
 
 	var resource Resource
 	if err := json.NewDecoder(resp.Body).Decode(&resource); err != nil {
@@ -105,10 +105,10 @@ func (c *Client) GetDownloadLink(ctx context.Context, path string) (*GetLinkResp
 	req.Header.Set("Authorization", "OAuth "+c.token)
 
 	resp, err := c.http.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("do request: %w", err)
-    }
-    defer resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
 
 	var getLinkResponse GetLinkResponse
 	if err := json.NewDecoder(resp.Body).Decode(&getLinkResponse); err != nil {

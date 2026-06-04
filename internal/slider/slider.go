@@ -3,13 +3,13 @@ package slider
 import (
 	// "context"
 	// "sync"
-	"fmt"
 	"errors"
+	"fmt"
 )
 
 type SlidingWindow[T any] struct {
 	rb   *ringBuffer[T]
-	Size int 
+	Size int
 }
 
 func New[T any](size int) (*SlidingWindow[T], error) {
@@ -76,9 +76,9 @@ func (sw *SlidingWindow[T]) Show() {
 
 func (sw *SlidingWindow[T]) getLR() (int, int) {
 	if sw.rb.way == Right {
-		return sw.rb.ht, (sw.rb.ht+sw.Size-1) % sw.Size
+		return sw.rb.ht, (sw.rb.ht + sw.Size - 1) % sw.Size
 	} else {
-		return (sw.rb.ht+1) % sw.Size, sw.rb.ht
+		return (sw.rb.ht + 1) % sw.Size, sw.rb.ht
 	}
 }
 

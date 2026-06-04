@@ -8,19 +8,19 @@ import (
 )
 
 type Worker[T any] struct {
-	Id   int
+	Id     int
 	Offset int // current job.offset (if busy == true)
 
 	jobs chan *Job[T]
-	Ctrl chan int  // offsets to kill
+	Ctrl chan int // offsets to kill
 
 	minOffset int
 	maxOffset int
 
-	fetch 	    Fetcher[T]
+	fetch Fetcher[T]
 
 	Busy bool
-	// mu 
+	// mu
 }
 
 type fetchResult[T any] struct {
@@ -30,9 +30,9 @@ type fetchResult[T any] struct {
 
 func newWorker[T any](id int, jobChan chan *Job[T], fetchFunc Fetcher[T]) *Worker[T] {
 	return &Worker[T]{
-		Id:   id,
-		jobs: jobChan,
-		Ctrl: make(chan int, 100),
+		Id:    id,
+		jobs:  jobChan,
+		Ctrl:  make(chan int, 100),
 		fetch: fetchFunc,
 	}
 }
@@ -93,7 +93,7 @@ func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (*T, error) {
 	}()
 
 	select {
-	case r := <- result:
+	case r := <-result:
 		return r.v, r.err
 
 	case indexToKill := <-w.Ctrl:
