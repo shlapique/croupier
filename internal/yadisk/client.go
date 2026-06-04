@@ -75,11 +75,45 @@ func (c *Client) GetMeta(ctx context.Context, path string, limit int, offset int
 	return &resource, nil
 }
 
-// map: Resource array -> Names array
-func MapNames[T any](items *[]T, getName func(T) string) []string {
-	names := make([]string, 0, len(*items))
-	for _, item := range *items {
-		names = append(names, getName(item))
+// returns href to direct download with smth like curl
+func (c *Client) GetDownloadLink(ctx context.Context, path string) (*GetLinkResponse, error) {
+	fmt.Printf("Trying to get download link to a file [%s]\n", path)
+
+	u := *c.baseURL
+
+	u.Path = u.Path + "/download"
+	q := u.Query()
+	q.Set("path", path)
+	u.RawQuery = q.Encode()
+
+	fmt.Printf("Full encoded queuery: %s\n", u.RawQuery)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return nil, err
 	}
-	return names
+	req.Header.Set("Authorization", "OAuth "+c.token)
+
+	resp, err := c.http.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("do request: %w", err)
+    }
+    defer resp.Body.Close()
+
+	var getLinkResponse GetLinkResponse
+	if err := json.NewDecoder(resp.Body).Decode(&getLinkResponse); err != nil {
+		return nil, err
+	}
+	fmt.Printf("GET response: %v\n", getLinkResponse)
+
+	return &getLinkResponse, nil
+}
+
+// map: Resource array -> Resource Subset Struct
+func MapSubset[T any, U any](items *[]T, f func(T) U) []U {
+	out := make([]U, 0, len(*items))
+	for _, item := range *items {
+		out = append(out, f(item))
+	}
+	return out
 }

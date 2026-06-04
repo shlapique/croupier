@@ -5,7 +5,7 @@ It has prealoding feature with Sliding Window (RingBuffer cache)
 
 ![](pics/pic.svg)
 
-## build
+## build for ARMv7l
 
 ```
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" -o croupier .

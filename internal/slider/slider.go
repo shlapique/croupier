@@ -73,3 +73,21 @@ func (sw *SlidingWindow[T]) Show() {
 		}
 	}
 }
+
+func (sw *SlidingWindow[T]) getLR() (int, int) {
+	if sw.rb.way == Right {
+		return sw.rb.ht, (sw.rb.ht+sw.Size-1) % sw.Size
+	} else {
+		return (sw.rb.ht+1) % sw.Size, sw.rb.ht
+	}
+}
+
+// fake 'getCell' i.e. relative get [l _ i _ _ _ r]
+func (sw *SlidingWindow[T]) GetCell(index int) (*T, error) {
+	if index < 0 || index > sw.Size-1 {
+		fmt.Printf("Invalid SlidingWindow index [%d]\n", index)
+		return nil, errors.New(fmt.Sprintf("Invalid SlidingWindow index [%d]\n", index))
+	}
+	l, _ := sw.getLR()
+	return sw.rb.buffer[(l+index)%sw.Size], nil
+}

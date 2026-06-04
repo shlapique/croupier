@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 	"bufio"
-	// "time"
+	"time"
 	"errors"
 
 	"croupier/internal/preloader"
@@ -53,7 +53,7 @@ func main() {
 	// yaclient
 	// we need to spec num of items per page
 	// => limit 
-	pageSize := 20
+	pageSize := 5
 	path := "disk:/kindle/"
 	client := yadisk.New(yadisk.Config{
 		Token: token,
@@ -79,13 +79,16 @@ func main() {
 		Offset:    0,
 		MinOffset: 0,
 		MaxOffset: maxOffset,
-		Size:      3,
-		Lag:       1,
+		Size:      5,
+		Lag:       4,
 		FetchFunc: func(i int) (yadisk.Page, error) { 
 			if i >= 0 && i <= maxOffset { 
+				// TODO
+				time.Sleep(1)
 				resp, err := client.GetMeta(ctx, path, pageSize, i*pageSize)
+				// items array
 				embArray := &resp.Embedded.Items
-				page := yadisk.Page{ Names: yadisk.MapNames[yadisk.Resource](embArray, func(r yadisk.Resource) string { return r.Name }) }
+				page := yadisk.Page{ Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File { return yadisk.File{ Name: r.Name, Path: r.Path } } ) }
 				return page, err
 			} else { 
 				return yadisk.Page{}, errors.New("i is out of bounds!") 
@@ -102,8 +105,7 @@ func main() {
 	}
 
 	fmt.Println("Now printing current window state...")
-	loader.Sw.Show()
-
+	loader.ShowWindow()
 
 	// user loop
 	scanner := bufio.NewScanner(os.Stdin)
@@ -123,7 +125,30 @@ func main() {
 				break
 			}
 		case "s":
-			loader.Sw.Show()
+			loader.ShowWindow()
+		// download current pages' [0]th indexed item
+		case "d":
+			fmt.Printf("Current LAG = %d\n", loader.Lag)
+			v, err := loader.Sw.GetCell(loader.Lag)
+			if err != nil {
+				fmt.Println("EROR download in cycle!")
+				break
+			}
+			if v == nil {
+				fmt.Printf("page by lag [%d]: %v\n", loader.Lag, nil)
+			} else {
+				fmt.Printf("page by lag [%d]: %v\n", loader.Lag, *v)
+				firstFile := v.Files[0]
+				fmt.Printf("First file: [%v]\n", firstFile)
+
+				fmt.Printf("Lets get FULL DOWNLOAD LINK TO THIS first file!\n")
+				resp, err := client.GetDownloadLink(ctx, firstFile.Path)
+				if err != nil {
+					fmt.Println("Unable to get Donwload link!")
+					break
+				}
+				fmt.Printf("RESPONCE: %v\n", resp)
+			}
 		}
     }
     if err := scanner.Err(); err != nil {

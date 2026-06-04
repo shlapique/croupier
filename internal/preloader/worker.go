@@ -62,9 +62,14 @@ func (w *Worker[T]) run(ctx context.Context) {
 				w.Busy = false
 				break
 			}
-			fmt.Printf("[worker %d] got item: %s!\n", w.Id, *v)
-			*job.el = *v
+			if v != nil {
+				fmt.Printf("[worker %d] got item: %s!\n", w.Id, *v)
+				*job.el = *v
+			} else {
+				job.el = nil
+			}
 			w.Busy = false
+			fmt.Printf("[worker %d] OK\n", w.Id)
 
 		case offsetToKill := <-w.Ctrl:
 			fmt.Printf("[worker %d] got ctrl offset (to kill): %d\n", w.Id, offsetToKill)

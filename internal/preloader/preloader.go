@@ -16,14 +16,14 @@ type Fetcher[T any] func(i int) (T, error)
 
 type Preloader[T any] struct {
 	Sw        *slider.SlidingWindow[T]
+	Offset    int // real 'skew' offset (index) in real data that we work with
+	Lag       int // a point (index) of SlidingWindow simmetry (or just a 'peephole')
 
 	jobChan   chan *Job[T]
 	workers   []*Worker[T] // array of chan to communicate with workers
 
-	offset    int // real 'skew' offset (index) in real data that we work with
 	minOffset int // 0
 	maxOffset int // real maxOffset in data
-	lag       int // a point (index) of SlidingWindow simmetry (or just a 'peephole')
 	fetch     Fetcher[T]
 }
 
@@ -80,9 +80,9 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 
 	loader := &Preloader[T]{
 		Sw:        sw,
-		lag:       config.Lag,
+		Lag:       config.Lag,
 		fetch:     config.FetchFunc,
-		offset:    config.Offset,
+		Offset:    config.Offset,
 		minOffset: config.MinOffset,
 		maxOffset: config.MaxOffset,
 
@@ -91,7 +91,7 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 	}
 
 	fmt.Println("Initializing Preloader")
-	l, r := getLR(loader.offset, loader.minOffset, loader.maxOffset, loader.lag, loader.Sw.Size)
+	l, r := getLR(loader.Offset, loader.minOffset, loader.maxOffset, loader.Lag, loader.Sw.Size)
 	fmt.Println("L =", l, "R =", r)
 
 	data := make([]*T, r-l+1)
@@ -124,13 +124,13 @@ func (loader *Preloader[T]) killJob(offsetIndex int) {
 }
 
 func (loader *Preloader[T]) LoadLeft() error {
-	if loader.offset == loader.minOffset {
-		fmt.Printf("Unable to move more left then minOffset [%d], current offset [%d]\n", loader.minOffset, loader.offset)
-		return errors.New(fmt.Sprintf("Unable to move more left then minOffset [%d], current offset [%d]\n", loader.minOffset, loader.offset))
+	if loader.Offset == loader.minOffset {
+		fmt.Printf("Unable to move more left then minOffset [%d], current offset [%d]\n", loader.minOffset, loader.Offset)
+		return errors.New(fmt.Sprintf("Unable to move more left then minOffset [%d], current offset [%d]\n", loader.minOffset, loader.Offset))
 	}
 
 	// touching the edge of sw
-	if loader.offset <= (loader.minOffset + loader.lag) {
+	if loader.Offset <= (loader.minOffset + loader.Lag) {
 		err := loader.Sw.SlideLeft(nil)
 		if err != nil {
 			fmt.Println("unable to load left:", err)
@@ -138,7 +138,7 @@ func (loader *Preloader[T]) LoadLeft() error {
 		}
 	} else {
 		// calc new index
-		l, r := getLR(loader.offset, loader.minOffset, loader.maxOffset, loader.lag, loader.Sw.Size)
+		l, r := getLR(loader.Offset, loader.minOffset, loader.maxOffset, loader.Lag, loader.Sw.Size)
 		idx := l - 1
 
 		// cancel oldest (right) job
@@ -155,18 +155,18 @@ func (loader *Preloader[T]) LoadLeft() error {
 			return err
 		}
 	}
-	loader.offset -= 1
+	loader.Offset -= 1
 	return nil
 }
 
 func (loader *Preloader[T]) LoadRight() error {
-	if loader.offset == loader.maxOffset {
-		fmt.Printf("Unable to move more right then maxOffset [%d], current offset [%d]\n", loader.maxOffset, loader.offset)
-		return errors.New(fmt.Sprintf("Unable to move right then maxOffset [%d], current offset [%d]\n", loader.maxOffset, loader.offset))
+	if loader.Offset == loader.maxOffset {
+		fmt.Printf("Unable to move more right then maxOffset [%d], current offset [%d]\n", loader.maxOffset, loader.Offset)
+		return errors.New(fmt.Sprintf("Unable to move right then maxOffset [%d], current offset [%d]\n", loader.maxOffset, loader.Offset))
 	}
 
 	// touching the edge of sw
-	if loader.offset >= (loader.maxOffset - (loader.Sw.Size-1-loader.lag)) {
+	if loader.Offset >= (loader.maxOffset - (loader.Sw.Size-1-loader.Lag)) {
 		err := loader.Sw.SlideRight(nil)
 		if err != nil {
 			fmt.Println("unable to load right:", err)
@@ -174,7 +174,7 @@ func (loader *Preloader[T]) LoadRight() error {
 		}
 	} else {
 		// calc new index
-		l, r := getLR(loader.offset, loader.minOffset, loader.maxOffset, loader.lag, loader.Sw.Size)
+		l, r := getLR(loader.Offset, loader.minOffset, loader.maxOffset, loader.Lag, loader.Sw.Size)
 		idx := r + 1 
 
 		// cancel oldest (left) job
@@ -191,6 +191,25 @@ func (loader *Preloader[T]) LoadRight() error {
 			return err
 		}
 	}
-	loader.offset += 1
+	loader.Offset += 1
 	return nil
+}
+
+func (loader *Preloader[T]) ShowWindow() {
+	for i := 0; i < loader.Sw.Size; i++ {
+		v, err := loader.Sw.GetCell(i)
+		if err != nil {
+			fmt.Printf("Unable to get cell [%d] from Window\n", i)
+			return
+		}
+		p := ""
+		if i == loader.Lag {
+			p = "<- LAG"
+		}
+		if v == nil {
+			fmt.Printf("i: %d, v: %v %s\n", i, nil, p)
+		} else {
+			fmt.Printf("i: %d, v: %v %s\n", i, *v, p)
+		}
+	}
 }

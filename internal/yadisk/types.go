@@ -41,6 +41,18 @@ type ResourceList struct {
 	PublicKey   *string    `json:"public_key,omitempty"`
 }
 
+type GetLinkResponse struct {
+	Href      string
+	Method    string
+	templated bool
+}
+
+// Resource subset
+type File struct {
+	Name string
+	Path string
+}
+
 type Page struct {
-	Names []string
+	Files []File
 }
