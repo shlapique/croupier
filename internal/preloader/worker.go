@@ -60,7 +60,7 @@ func (w *Worker[T]) run(ctx context.Context) {
 			if err != nil {
 				fmt.Printf("[worker %d] Unable to fetch!: %v\n", w.Id, err)
 				w.Busy = false
-				break
+				continue
 			}
 			if v != nil {
 				fmt.Printf("[worker %d] got item: %s!\n", w.Id, *v)
@@ -70,10 +70,6 @@ func (w *Worker[T]) run(ctx context.Context) {
 			}
 			w.Busy = false
 			fmt.Printf("[worker %d] OK\n", w.Id)
-
-		case offsetToKill := <-w.Ctrl:
-			fmt.Printf("[worker %d] got ctrl offset (to kill): %d\n", w.Id, offsetToKill)
-		}
 	}
 }
 
@@ -101,7 +97,6 @@ func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (*T, error) {
 		return nil, nil
 
 	case <-ctx.Done():
-		fmt.Printf("[worker %d] Timeout [15s] for 'timeoutFetch' function exceeded!\n", w.Id)
-		return nil, errors.New(fmt.Sprintf("[worker %d] Timeout [15s] for 'timeoutFetch' function exceeded!\n", w.Id))
+		return nil, ctx.Err()
 	}
 }

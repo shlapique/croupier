@@ -1,6 +1,9 @@
 package yadisk
 
-import "time"
+import (
+	"time"
+	"github.com/google/uuid"
+)
 
 type ResourceType string
 
@@ -49,8 +52,11 @@ type GetLinkResponse struct {
 
 // Resource subset
 type File struct {
+	Id   uuid.UUID
 	Name string
-	Path string
+	Path string // on disk
+	MD5  *string
+	Href string
 }
 
 type Page struct {

@@ -10,8 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	// "net/http"
+	// "log"
+	// "log/slog"
+
+	// "github.com/google/uuid"
+
 	"croupier/internal/preloader"
 	"croupier/internal/yadisk"
+	"croupier/internal/server"
 )
 
 func getEnv(key, defaultValue string) string {
@@ -28,6 +35,9 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
 
+	// logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	// logger.Info("started!")
+
 	token := getEnv("YANDEX_DISK_TOKEN", "")
 	if token == "" {
 		fmt.Println("YANDEX_DISK_TOKEN env var is required!")
@@ -39,6 +49,8 @@ func main() {
 		fmt.Println("DEBUG mode enabled")
 	}
 
+	// BACKEND
+	// *******
 	// yaclient
 	// we need to spec num of items per page
 	// => limit
@@ -73,7 +85,7 @@ func main() {
 		MinOffset: 0,
 		MaxOffset: maxOffset,
 		Size:      5,
-		Lag:       4,
+		Lag:       2,
 		FetchFunc: func(i int) (yadisk.Page, error) {
 			if i >= 0 && i <= maxOffset {
 				// TODO
@@ -81,7 +93,16 @@ func main() {
 				resp, err := client.GetMeta(ctx, path, pageSize, i*pageSize)
 				// items array
 				embArray := &resp.Embedded.Items
-				page := yadisk.Page{Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File { return yadisk.File{Name: r.Name, Path: r.Path} })}
+				page := yadisk.Page{
+					Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File { 
+						return yadisk.File{
+							Id:   uuid.NewString(), 
+							Name: r.Name, 
+							Path: r.Path, 
+							MD5:  r.MD5,
+						} 
+					}),
+				}
 				return page, err
 			} else {
 				return yadisk.Page{}, errors.New("i is out of bounds!")
@@ -92,13 +113,17 @@ func main() {
 
 	// create and init preloader
 	loader, err := preloader.New[yadisk.Page](ctx, pConfig)
-
 	if err != nil {
 		fmt.Println("Unable to create New Loader:", err)
 	}
+	// init preloader
+	loader.Init()
 
 	fmt.Println("Now printing current window state...")
 	loader.ShowWindow()
+
+	// create a server
+	server.New(loader, "1234")
 
 	// user loop
 	scanner := bufio.NewScanner(os.Stdin)
@@ -122,6 +147,7 @@ func main() {
 		// download current pages' [0]th indexed item
 		case "d":
 			fmt.Printf("Current LAG = %d\n", loader.Lag)
+			// get current PAGE
 			v, err := loader.Sw.GetCell(loader.Lag)
 			if err != nil {
 				fmt.Println("EROR download in cycle!")
@@ -135,24 +161,24 @@ func main() {
 				fmt.Printf("First file: [%v]\n", firstFile)
 
 				fmt.Printf("Lets get FULL DOWNLOAD LINK TO THIS first file!\n")
-				resp, err := client.GetDownloadLink(ctx, firstFile.Path)
+				resp, err := client.GetDownloadLink(ctx, firstFile)
 				if err != nil {
 					fmt.Println("Unable to get Donwload link!")
-					break
+					continue
 				}
 				fmt.Printf("LINK TO DOWNLOAD [%s]\n", resp.Href)
 				pth := "./tmp/" + firstFile.Name
 				fmt.Printf("Trying to download file to filepath [%s]\n", pth)
-				err = client.DownloadFile(ctx, pth, resp.Href)
+				err = client.DownloadFile(ctx, pth, resp.Href, firstFile.MD5)
 				if err != nil {
 					fmt.Println("Unable to download!")
-					break
+					continue
 				}
 				fmt.Println("DONE")
 			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
+		fmt.Fprintln(os.Stderr, "error:", err) 
 	}
 }

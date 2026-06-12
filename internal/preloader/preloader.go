@@ -19,6 +19,8 @@ type Preloader[T any] struct {
 	Offset int // real 'skew' offset (index) in real data that we work with
 	Lag    int // a point (index) of SlidingWindow simmetry (or just a 'peephole')
 
+	Active bool // false -> call preloader.Init(); else -> do nothing
+
 	jobChan chan *Job[T]
 	workers []*Worker[T] // array of chan to communicate with workers
 
@@ -90,6 +92,16 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 		jobChan: jobChan,
 	}
 
+	return loader, nil
+}
+
+// call this function before any slider movements
+func (loader *Preloader[T]) Init() {
+	if loader.Active {
+		fmt.Printf("Preloader already ACTIVE. Skipping.\n")
+		return
+	}
+
 	fmt.Println("Initializing Preloader")
 	l, r := getLR(loader.Offset, loader.minOffset, loader.maxOffset, loader.Lag, loader.Sw.Size)
 	fmt.Println("L =", l, "R =", r)
@@ -106,8 +118,6 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 
 	loader.Sw.Init(data)
 	fmt.Println("OK")
-
-	return loader, nil
 }
 
 func (loader *Preloader[T]) killJob(offsetIndex int) {

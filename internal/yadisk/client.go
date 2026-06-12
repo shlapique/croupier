@@ -2,12 +2,14 @@ package yadisk
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	// "os/signal"
+	"crypto/md5"
 	"io"
 	"strconv"
 	"time"
@@ -86,14 +88,14 @@ func MapSubset[T any, U any](items *[]T, f func(T) U) []U {
 }
 
 // returns href to direct download with smth like curl
-func (c *Client) GetDownloadLink(ctx context.Context, path string) (*GetLinkResponse, error) {
-	fmt.Printf("Trying to get download link to a file [%s]\n", path)
+func (c *Client) GetDownloadLink(ctx context.Context, file File) (*GetLinkResponse, error) {
+	fmt.Printf("Trying to get download link to a file [%s]\n", file.Path)
 
 	u := *c.baseURL
 
 	u.Path = u.Path + "/download"
 	q := u.Query()
-	q.Set("path", path)
+	q.Set("path", file.Path)
 	u.RawQuery = q.Encode()
 
 	fmt.Printf("Full encoded queuery: %s\n", u.RawQuery)
@@ -117,32 +119,4 @@ func (c *Client) GetDownloadLink(ctx context.Context, path string) (*GetLinkResp
 	fmt.Printf("GET response: %v\n", getLinkResponse)
 
 	return &getLinkResponse, nil
-}
-
-// no Auth needed
-func (c *Client) DownloadFile(ctx context.Context, filePath string, link string) error {
-	out, err := os.Create(filePath)
-	if err != nil {
-		fmt.Printf("Unable to create file [%s]\n", filePath)
-		return err
-	}
-	defer out.Close()
-
-	resp, err := http.Get(link)
-	if err != nil {
-		fmt.Printf("Unable to get link [%s]\n", link)
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		fmt.Errorf("bad status: %s", resp.Status)
-		return err
-	}
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		fmt.Printf("Unable to write into file [%s]\n", filePath)
-		return err
-	}
-	return nil
 }
