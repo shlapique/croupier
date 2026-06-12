@@ -10,6 +10,8 @@ import (
 	// "errors"
 	"fmt"
 	"log"
+	"io/fs"
+	"embed"
 
 	"croupier/internal/preloader"
 )
@@ -20,8 +22,15 @@ type Server[T any] struct {
 	Port   string
 }
 
-func New[T any](loader *preloader.Preloader[T], port string) *Server[T] {
+func New[T any](loader *preloader.Preloader[T], port string, assets embed.FS) *Server[T] {
 	mux := http.NewServeMux()
+
+	sub, err := fs.Sub(assets, "static")
+	if err != nil {
+		panic(err)
+	}
+
+	mux.Handle("/", http.FileServer(http.FS(sub)))
 
 	h := &PreloaderHandlers[T]{
 		loader: loader,

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"embed"
 
 	// "net/http"
 	"log"
@@ -20,6 +21,9 @@ import (
 	"croupier/internal/server"
 	"croupier/internal/yadisk"
 )
+
+//go:embed static/*
+var staticFS embed.FS
 
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
@@ -122,7 +126,7 @@ func main() {
 	loader.ShowWindow()
 
 	// create a server
-	serv := server.New(loader, "1234")
+	serv := server.New(loader, "1234", staticFS)
 	serv.Run(ctx)
 
 	log.Println("INFO: waiting for Ctrl+C...")

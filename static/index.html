@@ -2,74 +2,21 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <title>Downloader</title>
-
-    <link rel="stylesheet" href="/style.css">
+    <title>Croupier</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="container">
+<h1>Croupier</h1>
 
-    <header class="header">
-        <h1>Downloader</h1>
-
-        <div id="pageInfo">
-            Page 1
-        </div>
-    </header>
-
-    <section class="controls">
-        <button id="prevBtn">&larr;</button>
-        <button id="nextBtn">&rarr;</button>
-        <button id="selectAllBtn">Select All</button>
-    </section>
-
-    <section class="panel">
-        <h2>Files</h2>
-
-        <div id="fileList"></div>
-    </section>
-
-    <section class="panel">
-        <h2>
-            Selected
-            (<span id="selectedCount">0</span>)
-        </h2>
-
-        <div id="selectedList"></div>
-    </section>
-
-    <section class="panel">
-        <h2>Download</h2>
-
-        <div id="downloadFile">
-            Idle
-        </div>
-
-        <div class="progress">
-            <div id="progressBar"></div>
-        </div>
-
-        <div id="downloadText">
-            0 / 0
-        </div>
-
-        <div class="downloadButtons">
-            <button id="downloadBtn" class="download">
-                Download (0)
-            </button>
-
-            <button id="stopBtn" class="stop">
-                Stop
-            </button>
-        </div>
-    </section>
-
+<div>
+    <button id="prev">Prev</button>
+    <button id="next">Next</button>
 </div>
 
-<script src="/app.js"></script>
+<pre id="state"></pre>
+
+<script src="app.js"></script>
 
 </body>
 </html>
