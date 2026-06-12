@@ -2,7 +2,7 @@ package preloader
 
 import (
 	"context"
-	"errors"
+	// "errors"
 	"fmt"
 	"time"
 )
@@ -70,6 +70,7 @@ func (w *Worker[T]) run(ctx context.Context) {
 			}
 			w.Busy = false
 			fmt.Printf("[worker %d] OK\n", w.Id)
+		}
 	}
 }
 

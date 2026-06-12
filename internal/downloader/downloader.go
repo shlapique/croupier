@@ -2,23 +2,28 @@ package downloader
 
 import (
 	"context"
+	"encoding/hex"
 	// "sync"
-	"errors"
+	"crypto/md5"
+	"os"
+	"net/http"
+	// "errors"
+	"io"
 	"fmt"
 )
 
-type Downloader[T any] struct {
-	filesChan chan *T
-	workers   []*Worker[T]
+type Downloader struct {
+	filesChan chan File
+	workers   []*Worker
 }
 
-func New[T any](ctx Context.context, maxNumFiles int, workersNum int) {
-	workers := make([]*Worker[T], workersNum)
-	filesChan := make(chan *T, maxNumFiles)
+func New(ctx context.Context, maxNumFiles int, workersNum int, downloadPath string) *Downloader {
+	workers := make([]*Worker, workersNum)
+	filesChan := make(chan File, maxNumFiles)
 
 	// create workers
 	for i := range workersNum {
-		var w = createWorker[T](i, filesChan)
+		var w = createWorker(i, filesChan, downloadPath)
 		go w.run(ctx)
 		workers[i] = w
 	}

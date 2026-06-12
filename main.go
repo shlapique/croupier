@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	// "bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -11,10 +11,10 @@ import (
 	"time"
 
 	// "net/http"
-	// "log"
+	"log"
 	// "log/slog"
 
-	// "github.com/google/uuid"
+	"github.com/google/uuid"
 
 	"croupier/internal/preloader"
 	"croupier/internal/yadisk"
@@ -30,7 +30,6 @@ func getEnv(key, defaultValue string) string {
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -123,62 +122,24 @@ func main() {
 	loader.ShowWindow()
 
 	// create a server
-	server.New(loader, "1234")
+	serv := server.New(loader, "1234")
+	serv.Run(ctx)
 
-	// user loop
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("Enter lines (Ctrl+D to end):")
-	for scanner.Scan() {
-		switch scanner.Text() {
-		case "r":
-			err = loader.LoadRight()
-			if err != nil {
-				fmt.Println("EROR in cycle!")
-				break
-			}
-		case "l":
-			err = loader.LoadLeft()
-			if err != nil {
-				fmt.Println("EROR in cycle!")
-				break
-			}
-		case "s":
-			loader.ShowWindow()
-		// download current pages' [0]th indexed item
-		case "d":
-			fmt.Printf("Current LAG = %d\n", loader.Lag)
-			// get current PAGE
-			v, err := loader.Sw.GetCell(loader.Lag)
-			if err != nil {
-				fmt.Println("EROR download in cycle!")
-				break
-			}
-			if v == nil {
-				fmt.Printf("page by lag [%d]: %v\n", loader.Lag, nil)
-			} else {
-				fmt.Printf("page by lag [%d]: %v\n", loader.Lag, *v)
-				firstFile := v.Files[0]
-				fmt.Printf("First file: [%v]\n", firstFile)
+	log.Println("INFO: waiting for Ctrl+C...")
 
-				fmt.Printf("Lets get FULL DOWNLOAD LINK TO THIS first file!\n")
-				resp, err := client.GetDownloadLink(ctx, firstFile)
-				if err != nil {
-					fmt.Println("Unable to get Donwload link!")
-					continue
-				}
-				fmt.Printf("LINK TO DOWNLOAD [%s]\n", resp.Href)
-				pth := "./tmp/" + firstFile.Name
-				fmt.Printf("Trying to download file to filepath [%s]\n", pth)
-				err = client.DownloadFile(ctx, pth, resp.Href, firstFile.MD5)
-				if err != nil {
-					fmt.Println("Unable to download!")
-					continue
-				}
-				fmt.Println("DONE")
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err) 
-	}
+	<-interrupt
+	log.Println("Ctrl+C hit! Shutting down..!")
+	cancel()
+
+	//
+	// err = loader.LoadRight()
+	// err = loader.LoadLeft()
+	// loader.ShowWindow()
+	// get current PAGE
+	// v, err := loader.Sw.GetCell(loader.Lag)
+	// firstFile := v.Files[0]
+	// resp, err := client.GetDownloadLink(ctx, firstFile)
+	// fmt.Printf("LINK TO DOWNLOAD [%s]\n", resp.Href)
+	// pth := "./tmp/" + firstFile.Name
+	// err = client.DownloadFile(ctx, pth, resp.Href, firstFile.MD5)
 }

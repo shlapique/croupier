@@ -2,15 +2,15 @@ package yadisk
 
 import (
 	"context"
-	"encoding/hex"
+	// "encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
+	// "os"
 	// "os/signal"
-	"crypto/md5"
-	"io"
+	// "crypto/md5"
+	// "io"
 	"strconv"
 	"time"
 )

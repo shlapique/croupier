@@ -2,7 +2,6 @@ package yadisk
 
 import (
 	"time"
-	"github.com/google/uuid"
 )
 
 type ResourceType string
@@ -50,15 +49,35 @@ type GetLinkResponse struct {
 	templated bool
 }
 
+type Page struct {
+	Files []File
+}
+
 // Resource subset
 type File struct {
-	Id   uuid.UUID
+	Id   string
 	Name string
 	Path string // on disk
 	MD5  *string
 	Href string
 }
 
-type Page struct {
-	Files []File
+func (f *File) GetID() string {
+	return f.Id
+}
+
+func (f *File) GetName() string {
+	return f.Name
+}
+
+func (f *File) GetPath() string {
+	return f.Path
+}
+
+func (f *File) GetHref() string {
+	return f.Href
+}
+
+func (f *File) GetMD5() *string {
+	return f.MD5
 }

@@ -5,26 +5,24 @@ import (
 	// "errors"
 	"fmt"
 	// "time"
-
-	// "github.com/google/uuid"
 )
 
-type Worker[T any] struct {
+type Worker struct {
 	Id int
 	
 	DownloadPath string
 
-	HotFile *T // current downloading file 
+	HotFile File // current downloading file 
 
-	files chan *T // job chan
+	files chan File // job chan
 	Ctrl  chan int
 
 	Busy bool
 }
 
-func createWorker[T any](id int, files chan *T, DownloadPath string) *Worker {
-	fmt.Printf("Created worker %s!\n", id.String())
-	return &Worker[T]{
+func createWorker(id int, files chan File, DownloadPath string) *Worker {
+	fmt.Printf("Created worker %s!\n", id)
+	return &Worker{
 		Id:    id,
 		DownloadPath: DownloadPath,
 		files: files,
@@ -46,37 +44,31 @@ func (w *Worker) run(ctx context.Context) {
 				fmt.Printf("[Dworker %d] fileChan closed!\n", w.Id)
 				return
 			}
-			fmt.Printf("[Dworker %d] got new file: %d\n", w.Id, *file.Id)
+			fmt.Printf("[Dworker %d] got new file: %d\n", w.Id, file.GetID())
 
 			w.Busy = true
 			w.HotFile = file
 			
-			err := downloadFile(ctx, filePath, link, sum)
-			// err := getFile(ctx, 
-
+			err := w.getFile(ctx, file)
 			if err != nil {
 				fmt.Printf("[Dworker %d] Unable to fetch!: %v\n", w.Id, err)
 				w.Busy = false
 				break
 			}
-			if v != nil {
-				fmt.Printf("[Dworker %d] got item: %s!\n", w.Id, *v)
-				*job.el = *v
-			} else {
-				job.el = nil
-			}
 			w.Busy = false
-			fmt.Printf("[Dworker %d] OK\n", w.Id)
+			fmt.Printf("[Dworker %d] Waiting for a new File\n", w.Id)
+		}
 	}
 }
 
-func (w *Worker) getFile(ctx context.Context, f *File) error {
+func (w *Worker) getFile(ctx context.Context, f File) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	result := make(error, 1)
-	path := w.DownloadPath + "/" + f.Name
-	link := f.Href
+	result := make(chan error, 1)
+	path := w.DownloadPath + "/" + f.GetName()
+	link := f.GetHref()
+	sum := f.GetMD5()
 
 	go func() {
 		fmt.Printf("[Dworker %d] downloading %d ...\n", w.Id, w.HotFile)
@@ -85,14 +77,18 @@ func (w *Worker) getFile(ctx context.Context, f *File) error {
 	}()
 
 	select {
-	case r := <-result
-		return r.v, r.err
+	case r := <-result:
+		if r != nil {
+			return r
+		}
+		fmt.Printf("[Dworker %d] Downloaded file [%s]!\n", w.Id, f.GetName())
+		return r
 
-	case indexToKill := <-w.Ctrl:
-		fmt.Printf("[Dworker %d] file download %d cancelled!\n", w.Id, indexToKill)
-		return nil, nil
+	case <-w.Ctrl:
+		fmt.Printf("[Dworker %d] file download cancelled!\n", w.Id)
+		return nil
 
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
 }
