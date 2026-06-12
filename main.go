@@ -17,8 +17,8 @@ import (
 	"github.com/google/uuid"
 
 	"croupier/internal/preloader"
-	"croupier/internal/yadisk"
 	"croupier/internal/server"
+	"croupier/internal/yadisk"
 )
 
 func getEnv(key, defaultValue string) string {
@@ -93,13 +93,13 @@ func main() {
 				// items array
 				embArray := &resp.Embedded.Items
 				page := yadisk.Page{
-					Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File { 
+					Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File {
 						return yadisk.File{
-							Id:   uuid.NewString(), 
-							Name: r.Name, 
-							Path: r.Path, 
+							Id:   uuid.NewString(),
+							Name: r.Name,
+							Path: r.Path,
 							MD5:  r.MD5,
-						} 
+						}
 					}),
 				}
 				return page, err

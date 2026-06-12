@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	// "sync"
 	"crypto/md5"
-	"os"
 	"net/http"
+	"os"
 	// "errors"
-	"io"
 	"fmt"
+	"io"
 )
 
 type Downloader struct {
@@ -29,7 +29,7 @@ func New(ctx context.Context, maxNumFiles int, workersNum int, downloadPath stri
 	}
 	return &Downloader{
 		filesChan: filesChan,
-		workers: workers,
+		workers:   workers,
 	}
 }
 
@@ -126,4 +126,3 @@ func md5Sum(filePath string) (string, error) {
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
-

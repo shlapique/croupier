@@ -9,10 +9,10 @@ import (
 
 type Worker struct {
 	Id int
-	
+
 	DownloadPath string
 
-	HotFile File // current downloading file 
+	HotFile File // current downloading file
 
 	files chan File // job chan
 	Ctrl  chan int
@@ -23,10 +23,10 @@ type Worker struct {
 func createWorker(id int, files chan File, DownloadPath string) *Worker {
 	fmt.Printf("Created worker %s!\n", id)
 	return &Worker{
-		Id:    id,
+		Id:           id,
 		DownloadPath: DownloadPath,
-		files: files,
-		Ctrl:  make(chan int, 100),
+		files:        files,
+		Ctrl:         make(chan int, 100),
 	}
 }
 
@@ -48,7 +48,7 @@ func (w *Worker) run(ctx context.Context) {
 
 			w.Busy = true
 			w.HotFile = file
-			
+
 			err := w.getFile(ctx, file)
 			if err != nil {
 				fmt.Printf("[Dworker %d] Unable to fetch!: %v\n", w.Id, err)

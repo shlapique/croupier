@@ -1,39 +1,44 @@
 package server
+
 // server works with some 'struct Response'
 // and with some Preloader[T]
 
 import (
-	"net/http"
 	"context"
+	"net/http"
 	// "sync"
 	// "errors"
-	"log"
 	"fmt"
+	"log"
 
 	"croupier/internal/preloader"
 )
 
 type Server[T any] struct {
-	srv     *http.Server
-	Backend *preloader.Preloader[T]
-	Port    string
+	srv    *http.Server
+	Loader *preloader.Preloader[T]
+	Port   string
 }
 
-func New[T any](backend *preloader.Preloader[T], port string) *Server[T] {
+func New[T any](loader *preloader.Preloader[T], port string) *Server[T] {
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /state", stateHandler[T]{ loader: backend })
-	mux.HandleFunc("POST /next", nextHandler)
-	mux.HandleFunc("POST /prev", prevHandler)
+	h := &PreloaderHandlers[T]{
+		loader: loader,
+	}
+
+	mux.HandleFunc("GET /state", h.Current)
+	mux.HandleFunc("POST /next", h.Next)
+	mux.HandleFunc("POST /prev", h.Prev)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
 	return &Server[T]{
-		srv: srv,
-		Backend: backend,
-		Port: port,
+		srv:    srv,
+		Loader: loader,
+		Port:   port,
 	}
 }
 
