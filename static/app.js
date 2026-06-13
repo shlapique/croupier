@@ -109,28 +109,40 @@ async function download() {
     // Reset selection + counter immediately on click.
     clearSelection();
 
+    document.getElementById("cancel").style.display = "";
+
     log(`Sending ${files.length} file(s) to download...\n`);
 
-    const response = await fetch("/download", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(files),
-    });
+    try {
+        const response = await fetch("/download", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(files),
+        });
 
-    if (!response.ok) {
-        log(`Error: HTTP ${response.status}\n`);
-        return;
+        if (!response.ok) {
+            log(`Error: HTTP ${response.status}\n`);
+            return;
+        }
+
+        // Stream the server's log output and append it as it arrives.
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            log(decoder.decode(value, { stream: true }));
+        }
+    } catch (e) {
+        log(`Error: ${e.message}\n`);
+    } finally {
+        document.getElementById("cancel").style.display = "none";
     }
+}
 
-    // Stream the server's log output and append it as it arrives.
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        log(decoder.decode(value, { stream: true }));
-    }
+async function cancelDownload() {
+    await fetch("/cancel", { method: "POST" });
 }
 
 document.getElementById("next")
@@ -139,5 +151,6 @@ document.getElementById("prev")
     .addEventListener("click", () => navigate("prev"));
 document.getElementById("download").addEventListener("click", download);
 document.getElementById("reset").addEventListener("click", clearSelection);
+document.getElementById("cancel").addEventListener("click", cancelDownload);
 
 refresh();

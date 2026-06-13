@@ -14,19 +14,19 @@ type Worker struct {
 
 	HotFile File // current downloading file
 
-	files chan File // job chan
-	Ctrl  chan int
+	FilesChan chan File // job chan
+	Ctrl  chan cancelCmd
 
 	Busy bool
 }
 
-func createWorker(id int, files chan File, DownloadPath string) *Worker {
+func createWorker(id int, filesChan chan File, DownloadPath string) *Worker {
 	fmt.Printf("Created worker %s!\n", id)
 	return &Worker{
 		Id:           id,
 		DownloadPath: DownloadPath,
-		files:        files,
-		Ctrl:         make(chan int, 100),
+		FilesChan:        filesChan,
+		Ctrl:         make(chan cancelCmd, 100),
 	}
 }
 
@@ -39,7 +39,7 @@ func (w *Worker) run(ctx context.Context) {
 		case <-ctx.Done():
 			fmt.Printf("[Dworker %d] killed\n", w.Id)
 			return
-		case file, ok := <-w.files:
+		case file, ok := <-w.FilesChan:
 			if !ok {
 				fmt.Printf("[Dworker %d] fileChan closed!\n", w.Id)
 				return

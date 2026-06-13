@@ -55,11 +55,11 @@ type Page struct {
 
 // Resource subset
 type File struct {
-    Id   string  `json:"id"`
-    Name string  `json:"name"`
-    Path string  `json:"path"`
-    MD5  *string `json:"md5"`
-    Href string  `json:"href"`
+	Id   string  `json:"id"`
+	Name string  `json:"name"`
+	Path string  `json:"path"`
+	MD5  *string `json:"md5"`
+	Href string  `json:"href"`
 }
 
 func (f *File) GetID() string {

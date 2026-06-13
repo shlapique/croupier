@@ -1,15 +1,15 @@
 package server
 
 import (
+	"context"
 	"net/http"
-	// "context"
-	// "sync"
-	// "errors"
+	"sync"
 	"encoding/json"
+	// "errors"
 	"fmt"
 
-	"croupier/internal/preloader"
 	"croupier/internal/downloader"
+	"croupier/internal/preloader"
 	"croupier/internal/yadisk"
 )
 
@@ -18,9 +18,13 @@ type PreloaderHandlers[T any] struct {
 }
 
 type DownloaderHandlers struct {
+	mu         sync.Mutex
+	cancel     context.CancelFunc
 	downloader *downloader.Downloader
+	client     *yadisk.Client
 }
 
+// maybe add current lag (offset) to response
 func (h *PreloaderHandlers[T]) Current(w http.ResponseWriter, r *http.Request) {
 	v, err := h.loader.Sw.GetCell(h.loader.Lag)
 	if err != nil {
@@ -58,11 +62,61 @@ func (h *DownloaderHandlers) Download(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	defer r.Body.Close()
-	w.WriteHeader(http.StatusOK)
+	
+	if len(files) > (h.downloader.MaxNumFiles-len(h.downloader.FilesChan)) {
+		http.Error(w, fmt.Sprintf("Supports up to %d in queue: available slots = %d\n",
+		h.downloader.MaxNumFiles,
+		h.downloader.MaxNumFiles-len(h.downloader.FilesChan)),
+		http.StatusRequestEntityTooLarge)
+		return
+	}
+
 	fmt.Printf("Got files to download:\n")
 	fmt.Printf("%v", files)
+
+
+	h.mu.Lock()
+	if h.cancel != nil {
+		h.cancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	h.cancel = cancel
+	h.mu.Unlock()
+
+	// go block where we 'll obtain links to all files
+	go func() {
+		for _, v := range files {
+			file := v
+			resp, err := h.client.GetDownloadLink(ctx, file)
+
+			if err != nil {
+				fmt.Printf("Unable to get download link for a file: %s -> Skipping\n", file.Id)
+				continue
+			}
+			file.Href = resp.Href
+
+			select {
+			case <-ctx.Done():
+				return
+			case h.downloader.FilesChan <- &file:
+				// TODO remove
+				fmt.Printf("added file [%s] to file chan\n", file.Id)
+			}
+		}
+	}()
+
+	w.WriteHeader(http.StatusOK)
 }
 
-func selectItemHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("selectItemHandler!\n")
+func (h *DownloaderHandlers) CancelDownloads(w http.ResponseWriter, r *http.Request) {
+	h.mu.Lock()
+    if h.cancel != nil {
+        h.cancel()
+        h.cancel = nil
+    }
+    h.mu.Unlock()
+
+	h.downloader.CancelAll()
+	fmt.Printf("CancelDownloads fired!\n")
+	w.WriteHeader(http.StatusOK)
 }

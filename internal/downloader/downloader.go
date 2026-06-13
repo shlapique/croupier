@@ -12,15 +12,20 @@ import (
 	"io"
 )
 
+type cancelCmd int
+
+const kill cancelCmd = 67
+
 type Downloader struct {
-	filesChan chan File
+	FilesChan chan File
 	workers   []*Worker
+	MaxNumFiles  int // at one time downloading
 }
 
 type Config struct {
 	DownloadPath string
-	MaxNumFiles int // at one time downloading
-	WorkersNum int
+	MaxNumFiles  int // at one time downloading
+	WorkersNum   int
 }
 
 func New(ctx context.Context, config Config) *Downloader {
@@ -34,8 +39,41 @@ func New(ctx context.Context, config Config) *Downloader {
 		workers[i] = w
 	}
 	return &Downloader{
-		filesChan: filesChan,
+		FilesChan: filesChan,
 		workers:   workers,
+		MaxNumFiles: config.MaxNumFiles,
+	}
+}
+
+func (d *Downloader) CancelAll() {
+	// consume all files from FilesChan
+	// then cancel current worker files
+	go func() {
+		for {
+			f, ok := <-d.FilesChan
+			if !ok {
+				fmt.Println("FilesChan closed, draining done")
+				d.cancelWorkers()
+				return
+			} 
+			fmt.Printf("removed f [%s]\n", f.GetID())
+		}
+	}()
+}
+
+func (d *Downloader) cancelWorkers() {
+	// d.mu.Lock()
+	// defer d.mu.Unlock()
+	busyFound := false
+	for _, w := range d.workers {
+		if w.Busy {
+			busyFound = true
+			fmt.Printf("Found Busy worker [%d]!\n", w.Id)
+			w.Ctrl <-kill
+		}
+	}
+	if !busyFound {
+		fmt.Printf("There's no workers with status Busy\n")
 	}
 }
 

@@ -8,20 +8,20 @@ import (
 	"net/http"
 	// "sync"
 	// "errors"
-	"fmt"
-	"log"
-	"io/fs"
 	"embed"
+	"fmt"
+	"io/fs"
+	"log"
 
-	"croupier/internal/yadisk"
-	"croupier/internal/preloader"
 	"croupier/internal/downloader"
+	"croupier/internal/preloader"
+	"croupier/internal/yadisk"
 )
 
 type Server[T any] struct {
-	srv    *http.Server
+	srv     *http.Server
 	Backend *Backend[T]
-	Port   string
+	Port    string
 }
 
 type Backend[T any] struct {
@@ -49,19 +49,21 @@ func New[T any](backend *Backend[T], port string, assets embed.FS) *Server[T] {
 	mux.HandleFunc("POST /prev", ph.Prev)
 
 	dh := &DownloaderHandlers{
+		client:     backend.Client,
 		downloader: backend.Downloader,
 	}
 
 	mux.HandleFunc("POST /download", dh.Download)
+	mux.HandleFunc("POST /cancel", dh.CancelDownloads)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
 	return &Server[T]{
-		srv:    srv,
+		srv:     srv,
 		Backend: backend,
-		Port:   port,
+		Port:    port,
 	}
 }
 

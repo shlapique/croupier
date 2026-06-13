@@ -3,24 +3,24 @@ package main
 import (
 	// "bufio"
 	"context"
+	"crypto/sha256"
+	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"embed"
-	"crypto/sha256"
-	"encoding/hex"
 
 	// "net/http"
 	"log"
 	// "log/slog"
 
-	"croupier/internal/yadisk"
-	"croupier/internal/preloader"
 	"croupier/internal/downloader"
+	"croupier/internal/preloader"
 	"croupier/internal/server"
+	"croupier/internal/yadisk"
 )
 
 //go:embed static/*
@@ -140,8 +140,8 @@ func main() {
 	// create downloader
 	dConfig := downloader.Config{
 		DownloadPath: "./tmp/",
-		MaxNumFiles: 50,
-		WorkersNum: 2,
+		MaxNumFiles:  50,
+		WorkersNum:   2,
 	}
 	downloader := downloader.New(ctx, dConfig)
 
@@ -152,7 +152,7 @@ func main() {
 			loader,
 			downloader,
 		},
-		"1234", 
+		"1234",
 		staticFS,
 	)
 	serv.Run(ctx)
