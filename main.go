@@ -10,16 +10,17 @@ import (
 	"syscall"
 	"time"
 	"embed"
+	"crypto/sha256"
+	"encoding/hex"
 
 	// "net/http"
 	"log"
 	// "log/slog"
 
-	"github.com/google/uuid"
-
-	"croupier/internal/preloader"
-	"croupier/internal/server"
 	"croupier/internal/yadisk"
+	"croupier/internal/preloader"
+	"croupier/internal/downloader"
+	"croupier/internal/server"
 )
 
 //go:embed static/*
@@ -30,6 +31,17 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// id derived from the file's path and MD5
+func fileID(path string, md5 *string) string {
+	h := sha256.New()
+	h.Write([]byte(path))
+	h.Write([]byte{0})
+	if md5 != nil {
+		h.Write([]byte(*md5))
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func main() {
@@ -83,6 +95,7 @@ func main() {
 	maxOffset := total / pageSize
 	fmt.Printf("total [%d], pageSize [%d], maxOffset [%d]\n", total, pageSize, maxOffset)
 
+	// create and init preloader
 	pConfig := preloader.Config[yadisk.Page]{
 		Offset:    0,
 		MinOffset: 0,
@@ -99,7 +112,7 @@ func main() {
 				page := yadisk.Page{
 					Files: yadisk.MapSubset(embArray, func(r yadisk.Resource) yadisk.File {
 						return yadisk.File{
-							Id:   uuid.NewString(),
+							Id:   fileID(r.Path, r.MD5),
 							Name: r.Name,
 							Path: r.Path,
 							MD5:  r.MD5,
@@ -114,8 +127,7 @@ func main() {
 		WorkersNum: 2,
 	}
 
-	// create and init preloader
-	loader, err := preloader.New[yadisk.Page](ctx, pConfig)
+	loader, err := preloader.New(ctx, pConfig)
 	if err != nil {
 		fmt.Println("Unable to create New Loader:", err)
 	}
@@ -125,8 +137,24 @@ func main() {
 	fmt.Println("Now printing current window state...")
 	loader.ShowWindow()
 
+	// create downloader
+	dConfig := downloader.Config{
+		DownloadPath: "./tmp/",
+		MaxNumFiles: 50,
+		WorkersNum: 2,
+	}
+	downloader := downloader.New(ctx, dConfig)
+
 	// create a server
-	serv := server.New(loader, "1234", staticFS)
+	serv := server.New(
+		&server.Backend[yadisk.Page]{
+			client,
+			loader,
+			downloader,
+		},
+		"1234", 
+		staticFS,
+	)
 	serv.Run(ctx)
 
 	log.Println("INFO: waiting for Ctrl+C...")

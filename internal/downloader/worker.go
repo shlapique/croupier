@@ -66,7 +66,7 @@ func (w *Worker) getFile(ctx context.Context, f File) error {
 	defer cancel()
 
 	result := make(chan error, 1)
-	path := w.DownloadPath + "/" + f.GetName()
+	path := w.DownloadPath + f.GetName()
 	link := f.GetHref()
 	sum := f.GetMD5()
 

@@ -17,13 +17,19 @@ type Downloader struct {
 	workers   []*Worker
 }
 
-func New(ctx context.Context, maxNumFiles int, workersNum int, downloadPath string) *Downloader {
-	workers := make([]*Worker, workersNum)
-	filesChan := make(chan File, maxNumFiles)
+type Config struct {
+	DownloadPath string
+	MaxNumFiles int // at one time downloading
+	WorkersNum int
+}
+
+func New(ctx context.Context, config Config) *Downloader {
+	workers := make([]*Worker, config.WorkersNum)
+	filesChan := make(chan File, config.MaxNumFiles)
 
 	// create workers
-	for i := range workersNum {
-		var w = createWorker(i, filesChan, downloadPath)
+	for i := range config.WorkersNum {
+		var w = createWorker(i, filesChan, config.DownloadPath)
 		go w.run(ctx)
 		workers[i] = w
 	}

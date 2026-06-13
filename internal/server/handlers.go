@@ -9,12 +9,16 @@ import (
 	"fmt"
 
 	"croupier/internal/preloader"
-	// "croupier/internal/downloader"
-	// "croupier/internal/yadisk"
+	"croupier/internal/downloader"
+	"croupier/internal/yadisk"
 )
 
 type PreloaderHandlers[T any] struct {
 	loader *preloader.Preloader[T]
+}
+
+type DownloaderHandlers struct {
+	downloader *downloader.Downloader
 }
 
 func (h *PreloaderHandlers[T]) Current(w http.ResponseWriter, r *http.Request) {
@@ -48,8 +52,15 @@ func (h *PreloaderHandlers[T]) Prev(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func downloadSelectedHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("downloadSelectedHandler!\n")
+func (h *DownloaderHandlers) Download(w http.ResponseWriter, r *http.Request) {
+	var files []yadisk.File
+	if err := json.NewDecoder(r.Body).Decode(&files); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	defer r.Body.Close()
+	w.WriteHeader(http.StatusOK)
+	fmt.Printf("Got files to download:\n")
+	fmt.Printf("%v", files)
 }
 
 func selectItemHandler(w http.ResponseWriter, r *http.Request) {

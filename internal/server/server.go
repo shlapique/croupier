@@ -13,16 +13,24 @@ import (
 	"io/fs"
 	"embed"
 
+	"croupier/internal/yadisk"
 	"croupier/internal/preloader"
+	"croupier/internal/downloader"
 )
 
 type Server[T any] struct {
 	srv    *http.Server
-	Loader *preloader.Preloader[T]
+	Backend *Backend[T]
 	Port   string
 }
 
-func New[T any](loader *preloader.Preloader[T], port string, assets embed.FS) *Server[T] {
+type Backend[T any] struct {
+	Client     *yadisk.Client
+	Preloader  *preloader.Preloader[T]
+	Downloader *downloader.Downloader
+}
+
+func New[T any](backend *Backend[T], port string, assets embed.FS) *Server[T] {
 	mux := http.NewServeMux()
 
 	sub, err := fs.Sub(assets, "static")
@@ -32,13 +40,19 @@ func New[T any](loader *preloader.Preloader[T], port string, assets embed.FS) *S
 
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 
-	h := &PreloaderHandlers[T]{
-		loader: loader,
+	ph := &PreloaderHandlers[T]{
+		loader: backend.Preloader,
 	}
 
-	mux.HandleFunc("GET /state", h.Current)
-	mux.HandleFunc("POST /next", h.Next)
-	mux.HandleFunc("POST /prev", h.Prev)
+	mux.HandleFunc("GET /state", ph.Current)
+	mux.HandleFunc("POST /next", ph.Next)
+	mux.HandleFunc("POST /prev", ph.Prev)
+
+	dh := &DownloaderHandlers{
+		downloader: backend.Downloader,
+	}
+
+	mux.HandleFunc("POST /download", dh.Download)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
@@ -46,7 +60,7 @@ func New[T any](loader *preloader.Preloader[T], port string, assets embed.FS) *S
 	}
 	return &Server[T]{
 		srv:    srv,
-		Loader: loader,
+		Backend: backend,
 		Port:   port,
 	}
 }
