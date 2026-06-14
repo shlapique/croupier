@@ -17,9 +17,9 @@ type cancelCmd int
 const kill cancelCmd = 67
 
 type Downloader struct {
-	FilesChan chan File
-	workers   []*Worker
-	MaxNumFiles  int // at one time downloading
+	FilesChan   chan File
+	workers     []*Worker
+	MaxNumFiles int // at one time downloading
 }
 
 type Config struct {
@@ -39,8 +39,8 @@ func New(ctx context.Context, config Config) *Downloader {
 		workers[i] = w
 	}
 	return &Downloader{
-		FilesChan: filesChan,
-		workers:   workers,
+		FilesChan:   filesChan,
+		workers:     workers,
 		MaxNumFiles: config.MaxNumFiles,
 	}
 }
@@ -55,7 +55,7 @@ func (d *Downloader) CancelAll() {
 				fmt.Println("FilesChan closed, draining done")
 				d.cancelWorkers()
 				return
-			} 
+			}
 			fmt.Printf("removed f [%s]\n", f.GetID())
 		}
 	}()
@@ -69,7 +69,7 @@ func (d *Downloader) cancelWorkers() {
 		if w.Busy {
 			busyFound = true
 			fmt.Printf("Found Busy worker [%d]!\n", w.Id)
-			w.Ctrl <-kill
+			w.Ctrl <- kill
 		}
 	}
 	if !busyFound {

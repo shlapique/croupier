@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
-	"encoding/json"
 	// "errors"
 	"fmt"
 
@@ -62,18 +62,17 @@ func (h *DownloaderHandlers) Download(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	defer r.Body.Close()
-	
-	if len(files) > (h.downloader.MaxNumFiles-len(h.downloader.FilesChan)) {
+
+	if len(files) > (h.downloader.MaxNumFiles - len(h.downloader.FilesChan)) {
 		http.Error(w, fmt.Sprintf("Supports up to %d in queue: available slots = %d\n",
-		h.downloader.MaxNumFiles,
-		h.downloader.MaxNumFiles-len(h.downloader.FilesChan)),
-		http.StatusRequestEntityTooLarge)
+			h.downloader.MaxNumFiles,
+			h.downloader.MaxNumFiles-len(h.downloader.FilesChan)),
+			http.StatusRequestEntityTooLarge)
 		return
 	}
 
 	fmt.Printf("Got files to download:\n")
 	fmt.Printf("%v", files)
-
 
 	h.mu.Lock()
 	if h.cancel != nil {
@@ -110,11 +109,11 @@ func (h *DownloaderHandlers) Download(w http.ResponseWriter, r *http.Request) {
 
 func (h *DownloaderHandlers) CancelDownloads(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
-    if h.cancel != nil {
-        h.cancel()
-        h.cancel = nil
-    }
-    h.mu.Unlock()
+	if h.cancel != nil {
+		h.cancel()
+		h.cancel = nil
+	}
+	h.mu.Unlock()
 
 	h.downloader.CancelAll()
 	fmt.Printf("CancelDownloads fired!\n")

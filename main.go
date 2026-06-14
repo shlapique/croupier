@@ -13,9 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	// "net/http"
 	"log"
+	"net"
 	// "log/slog"
+
+	_ "golang.org/x/crypto/x509roots/fallback"
 
 	"croupier/internal/downloader"
 	"croupier/internal/preloader"
@@ -57,6 +59,16 @@ func main() {
 	if token == "" {
 		fmt.Println("YANDEX_DISK_TOKEN env var is required!")
 		return
+	}
+
+	if dns := os.Getenv("CROUPIER_DNS"); dns != "" {
+		net.DefaultResolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				d := net.Dialer{Timeout: 10 * time.Second}
+				return d.DialContext(ctx, "udp", dns)
+			},
+		}
 	}
 
 	debug := getEnv("DEBUG", "0")
@@ -163,15 +175,6 @@ func main() {
 	log.Println("Ctrl+C hit! Shutting down..!")
 	cancel()
 
-	//
-	// err = loader.LoadRight()
-	// err = loader.LoadLeft()
-	// loader.ShowWindow()
-	// get current PAGE
-	// v, err := loader.Sw.GetCell(loader.Lag)
-	// firstFile := v.Files[0]
-	// resp, err := client.GetDownloadLink(ctx, firstFile)
-	// fmt.Printf("LINK TO DOWNLOAD [%s]\n", resp.Href)
-	// pth := "./tmp/" + firstFile.Name
-	// err = client.DownloadFile(ctx, pth, resp.Href, firstFile.MD5)
+	// giving some time for goroutines to finish
+	time.Sleep(time.Second * 2)
 }

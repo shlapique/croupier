@@ -15,7 +15,7 @@ type Worker struct {
 	HotFile File // current downloading file
 
 	FilesChan chan File // job chan
-	Ctrl  chan cancelCmd
+	Ctrl      chan cancelCmd
 
 	Busy bool
 }
@@ -25,7 +25,7 @@ func createWorker(id int, filesChan chan File, DownloadPath string) *Worker {
 	return &Worker{
 		Id:           id,
 		DownloadPath: DownloadPath,
-		FilesChan:        filesChan,
+		FilesChan:    filesChan,
 		Ctrl:         make(chan cancelCmd, 100),
 	}
 }
