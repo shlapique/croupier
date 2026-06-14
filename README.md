@@ -22,18 +22,20 @@ Example for window size = 5:
 lag = 2
 
 ```
-**@**
-01234
+_____**@**________
+     01234
 ```
 
 lag = 0
 
 ```
-@****
-01234
+_____@****________
+     01234
 ```
 
-# run on ARMv7l Kindle (Termux)
+## run on ARMv7l Kindle (Termux)
+
+Export `YANDEX_DISK_TOKEN` access token. [How to get it](https://yandex.com/dev/disk/rest/)
 
 By default Termux doesnt expose DNS correctly so run like this:
 
@@ -41,21 +43,21 @@ By default Termux doesnt expose DNS correctly so run like this:
 CROUPIER_DNS=8.8.8.8:53 ./croupier
 ```
 
-# how to build
+## how to build
 
-## static build for ARMv7l
+### static build for ARMv7l
 
 ```
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" -o croupier .
 ```
 
-## static build for amd64
+### static build for amd64
 
 ```
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o croupier-linux-amd64 .
 ```
 
-## TODO
+### TODO
 
 - add config
 - add proper logging
