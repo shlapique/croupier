@@ -76,7 +76,7 @@ func (w *Worker[T]) run(ctx context.Context) {
 
 // set a timeout for fetch ALL opearations (e.g. 15s) -- sane
 // fetch itself may have timeout too
-// FIXME remove hardcoded 15 value
+// FIXME cfg
 func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (*T, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

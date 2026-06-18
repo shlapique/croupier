@@ -19,6 +19,7 @@ import (
 
 	_ "golang.org/x/crypto/x509roots/fallback"
 
+	"croupier/internal/config"
 	"croupier/internal/downloader"
 	"croupier/internal/preloader"
 	"croupier/internal/server"
@@ -61,6 +62,7 @@ func main() {
 		return
 	}
 
+	// we need this for Termux
 	if dns := os.Getenv("CROUPIER_DNS"); dns != "" {
 		net.DefaultResolver = &net.Resolver{
 			PreferGo: true,
@@ -71,24 +73,31 @@ func main() {
 		}
 	}
 
-	debug := getEnv("DEBUG", "0")
-	if debug == "1" {
-		fmt.Println("DEBUG mode enabled")
+	cfg, err := config.Load("./config.yml")
+	if err != nil {
+		fmt.Printf("Unable to load config: \n", err)
+		return
 	}
+	// fmt.Printf("TEst print of cfg!\n")
+	// fmt.Printf("%v %v %v %v\n", cfg.Client, cfg.Preloader, cfg.Downloader, cfg.Server)
+
+	// debug := getEnv("DEBUG", "0")
+	// if debug == "1" {
+	// 	fmt.Println("DEBUG mode enabled")
+	// }
 
 	// BACKEND
 	// *******
 	// yaclient
 	// we need to spec num of items per page
 	// => limit
-	pageSize := 5
-	path := "disk:/kindle/"
+
 	client := yadisk.New(yadisk.Config{
-		Token:   token,
-		Timeout: 15,
+		Token: token,
+		Timeout: time.Duration(cfg.Client.Timeout) * time.Second,
 	})
 	// get inital info about folder
-	meta, err := client.GetMeta(ctx, path, pageSize, 0)
+	meta, err := client.GetMeta(ctx, cfg.Client.Path, cfg.Client.PageSize, 0)
 	if err != nil {
 		fmt.Println("Error: ", err)
 	}
@@ -104,21 +113,21 @@ func main() {
 	}
 
 	total := meta.Embedded.Total
-	maxOffset := total / pageSize
-	fmt.Printf("total [%d], pageSize [%d], maxOffset [%d]\n", total, pageSize, maxOffset)
+	maxOffset := total / cfg.Client.PageSize
+	fmt.Printf("total [%d], pageSize [%d], maxOffset [%d]\n", total, cfg.Client.PageSize, maxOffset)
 
 	// create and init preloader
 	pConfig := preloader.Config[yadisk.Page]{
 		Offset:    0,
 		MinOffset: 0,
 		MaxOffset: maxOffset,
-		Size:      5,
-		Lag:       2,
+		Size: cfg.Preloader.WindowSize,
+		Lag: cfg.Preloader.WindowLag,
 		FetchFunc: func(i int) (yadisk.Page, error) {
 			if i >= 0 && i <= maxOffset {
 				// TODO
 				time.Sleep(1)
-				resp, err := client.GetMeta(ctx, path, pageSize, i*pageSize)
+				resp, err := client.GetMeta(ctx, cfg.Client.Path, cfg.Client.PageSize, i*cfg.Client.PageSize)
 				// items array
 				embArray := &resp.Embedded.Items
 				page := yadisk.Page{
@@ -136,7 +145,7 @@ func main() {
 				return yadisk.Page{}, errors.New("i is out of bounds!")
 			}
 		},
-		WorkersNum: 2,
+		WorkersNum: cfg.Preloader.WorkersNum,
 	}
 
 	loader, err := preloader.New(ctx, pConfig)
@@ -151,9 +160,9 @@ func main() {
 
 	// create downloader
 	dConfig := downloader.Config{
-		DownloadPath: "./tmp/",
-		MaxNumFiles:  50,
-		WorkersNum:   2,
+		DownloadPath: cfg.Downloader.Path,
+		MaxNumFiles: cfg.Downloader.MaxConcurrentFiles,
+		WorkersNum: cfg.Downloader.WorkersNum,
 	}
 	downloader := downloader.New(ctx, dConfig)
 
@@ -164,7 +173,7 @@ func main() {
 			loader,
 			downloader,
 		},
-		"1234",
+		cfg.Server.Port,
 		staticFS,
 	)
 	serv.Run(ctx)

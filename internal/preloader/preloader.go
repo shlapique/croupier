@@ -71,8 +71,8 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 	}
 
 	workers := make([]*Worker[T], config.WorkersNum)
-	// FIXME add jobs chan size param
-	jobChan := make(chan *Job[T], 100)
+	// FIXME cfg
+	jobChan := make(chan *Job[T], 500)
 	// create workers
 	for i := range config.WorkersNum {
 		var w = newWorker[T](i, jobChan, config.FetchFunc)

@@ -26,7 +26,8 @@ func createWorker(id int, filesChan chan File, DownloadPath string) *Worker {
 		Id:           id,
 		DownloadPath: DownloadPath,
 		FilesChan:    filesChan,
-		Ctrl:         make(chan cancelCmd, 100),
+		// FIXME cfg
+		Ctrl: make(chan cancelCmd, 100),
 	}
 }
 

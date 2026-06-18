@@ -1,0 +1,26 @@
+---
+client:
+  # folder on a disk
+  path: "disk:/kindle/"
+  # number of items per page
+  page_size: 15
+  timeout: 15
+
+preloader: 
+  # in the end max reject time -- client.timeout + timeout
+  timeout: 15
+
+  # sliding window size
+  window_size: 5
+  window_lag: 2
+  # in general this var is limited with `nproc`
+  workers_num: 2
+
+downloader:
+  # target local folder
+  path: "./"
+  max_concurrent_files: 50
+  workers_num: 2
+
+server:
+  port: "1234"
