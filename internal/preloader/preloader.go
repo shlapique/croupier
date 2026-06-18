@@ -5,6 +5,7 @@ import (
 	// "sync"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"croupier/internal/slider"
@@ -16,10 +17,11 @@ import (
 type Fetcher[T any] func(i int) (T, error)
 
 type Preloader[T any] struct {
-	Sw     *slider.SlidingWindow[T]
-	Offset int // real 'skew' offset (index) in real data that we work with
-	Lag    int // a point (index) of SlidingWindow simmetry (or just a 'peephole')
+	l *slog.Logger
 
+	Sw     *slider.SlidingWindow[T]
+	Offset int  // real 'skew' offset (index) in real data that we work with
+	Lag    int  // a point (index) of SlidingWindow simmetry (or just a 'peephole')
 	Active bool // false -> call preloader.Init(); else -> do nothing
 
 	jobChan chan *Job[T]
@@ -31,12 +33,13 @@ type Preloader[T any] struct {
 }
 
 type Config[T any] struct {
+	L *slog.Logger
+
 	Offset    int // starting data index [MinOffset...MaxOffset]
 	MinOffset int // 0 (usually)
 	MaxOffset int //
 
 	Size int // i.e. windowSize
-
 	// Lag === an index of simmetry (or just a 'peephole'):
 	// when 0: we preload forward only ...
 	// when 1: preload 1 back and others forward...
@@ -53,22 +56,28 @@ func getLR(offset int, minOffset int, maxOffset int, lag int, windowSize int) (i
 }
 
 func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
+	l := config.L
+	if l == nil {
+		l = slog.New(slog.Default().Handler())
+	}
+	l = l.With("pkg", "loader")
+
 	if config.Lag < 0 || config.Lag > (config.Size-1) {
-		fmt.Println("Lag has to be insize [0, Size-1]")
+		l.Error("Lag has to be insize [0, Size-1]")
 		return nil, errors.New("incorrect Preloader Lag")
 	}
 	if config.MinOffset > config.MaxOffset || config.MaxOffset < config.MinOffset {
-		fmt.Println("MinOffset and MaxOffset have to be [MinOffset, MaxOffset]")
+		l.Error("MinOffset and MaxOffset have to be [MinOffset, MaxOffset]")
 		return nil, errors.New(fmt.Sprintf("incorrect Preloader MinOffset [%d] or MaxOffset [%d]\n", config.MinOffset, config.MaxOffset))
 	}
 	if config.Offset < config.MinOffset || config.Offset > config.MaxOffset {
-		fmt.Println("Offset has to be insize [MinOffset, MaxOffset]")
+		l.Error("Offset has to be insize [MinOffset, MaxOffset]")
 		return nil, errors.New(fmt.Sprintf("incorrect Preloader offset [%d]\n", config.Offset))
 	}
 
 	sw, err := slider.New[T](config.Size)
 	if err != nil {
-		fmt.Println("Unable to create NewSlidingWindow")
+		l.Error("Unable to create NewSlidingWindow", "err", err)
 		return nil, err
 	}
 
@@ -77,21 +86,22 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 	jobChan := make(chan *Job[T], 500)
 	// create workers
 	for i := range config.WorkersNum {
-		var w = newWorker[T](i, jobChan, config.FetchFunc, config.Timeout)
+		wLogger := l.With("worker", i)
+		var w = newWorker[T](wLogger, i, jobChan, config.FetchFunc, config.Timeout)
 		go w.run(ctx)
 		workers[i] = w
 	}
 
 	loader := &Preloader[T]{
+		l:         l,
 		Sw:        sw,
 		Lag:       config.Lag,
 		fetch:     config.FetchFunc,
 		Offset:    config.Offset,
 		minOffset: config.MinOffset,
 		maxOffset: config.MaxOffset,
-
-		workers: workers,
-		jobChan: jobChan,
+		workers:   workers,
+		jobChan:   jobChan,
 	}
 
 	return loader, nil
@@ -100,44 +110,43 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 // call this function before any slider movements
 func (loader *Preloader[T]) Init() {
 	if loader.Active {
-		fmt.Printf("Preloader already ACTIVE. Skipping.\n")
+		loader.l.Info("Preloader already active. Skipping.")
 		return
 	}
 
-	fmt.Println("Initializing Preloader")
+	loader.l.Info("Initializing Preloader")
 	l, r := getLR(loader.Offset, loader.minOffset, loader.maxOffset, loader.Lag, loader.Sw.Size)
-	fmt.Println("L =", l, "R =", r)
+	loader.l.Debug("L", l, "R", r)
 
 	data := make([]*T, r-l+1)
 
 	for i := l; i <= r; i++ {
 		v := new(T)
 		job := Job[T]{v, i}
-		fmt.Printf("CREATING i: %d, v addr: %v\n", i, v)
+		loader.l.Debug("creating i", "i", i, "&v", v)
 		loader.jobChan <- &job
 		data[i-l] = v
 	}
 
 	loader.Sw.Init(data)
-	fmt.Println("OK")
 }
 
 func (loader *Preloader[T]) killJob(offsetIndex int) {
 	for _, w := range loader.workers {
 		if w.Busy && w.Offset == offsetIndex {
-			fmt.Printf("Found Busy worker [%d] with offset [%d]!\n", w.Id, w.Offset)
-			fmt.Printf("Sending offsetIndex to kill [%d]\n", offsetIndex)
+			loader.l.Debug("Found Busy worker with proper offset", "worker", w.Id, "offset", w.Offset)
+			loader.l.Debug("Sending offsetIndex to kill", "offsetIndex", offsetIndex)
 			w.Ctrl <- offsetIndex
 			return
 		}
 	}
-	fmt.Printf("There's no workers with Offset [%d] and status Busy\n", offsetIndex)
+	loader.l.Info("There's no workers with proper needed offset and status Busy", "offset", offsetIndex)
 	return
 }
 
 func (loader *Preloader[T]) LoadLeft() error {
 	if loader.Offset == loader.minOffset {
-		fmt.Printf("Unable to move more left then minOffset [%d], current offset [%d]\n", loader.minOffset, loader.Offset)
+		loader.l.Error("Unable to move more left then minOffset", "minOffset", loader.minOffset, "current offset", loader.Offset)
 		return errors.New(fmt.Sprintf("Unable to move more left then minOffset [%d], current offset [%d]\n", loader.minOffset, loader.Offset))
 	}
 
@@ -145,7 +154,7 @@ func (loader *Preloader[T]) LoadLeft() error {
 	if loader.Offset <= (loader.minOffset + loader.Lag) {
 		err := loader.Sw.SlideLeft(nil)
 		if err != nil {
-			fmt.Println("unable to load left:", err)
+			loader.l.Error("Unable to load left", "err", err)
 			return err
 		}
 	} else {
@@ -163,7 +172,7 @@ func (loader *Preloader[T]) LoadLeft() error {
 
 		err := loader.Sw.SlideLeft(v)
 		if err != nil {
-			fmt.Println("unable to load left:", err)
+			loader.l.Error("Unable to load left", "err", err)
 			return err
 		}
 	}
@@ -173,7 +182,7 @@ func (loader *Preloader[T]) LoadLeft() error {
 
 func (loader *Preloader[T]) LoadRight() error {
 	if loader.Offset == loader.maxOffset {
-		fmt.Printf("Unable to move more right then maxOffset [%d], current offset [%d]\n", loader.maxOffset, loader.Offset)
+		loader.l.Error("Unable to move more right then maxOffset", "maxOffset", loader.maxOffset, "current offset", loader.Offset)
 		return errors.New(fmt.Sprintf("Unable to move right then maxOffset [%d], current offset [%d]\n", loader.maxOffset, loader.Offset))
 	}
 
@@ -181,7 +190,7 @@ func (loader *Preloader[T]) LoadRight() error {
 	if loader.Offset >= (loader.maxOffset - (loader.Sw.Size - 1 - loader.Lag)) {
 		err := loader.Sw.SlideRight(nil)
 		if err != nil {
-			fmt.Println("unable to load right:", err)
+			loader.l.Error("Unable to load right", "err", err)
 			return err
 		}
 	} else {
@@ -199,7 +208,7 @@ func (loader *Preloader[T]) LoadRight() error {
 
 		err := loader.Sw.SlideRight(v)
 		if err != nil {
-			fmt.Println("unable to load fight:", err)
+			loader.l.Error("Unable to load right", "err", err)
 			return err
 		}
 	}
@@ -211,7 +220,7 @@ func (loader *Preloader[T]) ShowWindow() {
 	for i := 0; i < loader.Sw.Size; i++ {
 		v, err := loader.Sw.GetCell(i)
 		if err != nil {
-			fmt.Printf("Unable to get cell [%d] from Window\n", i)
+			loader.l.Error("Unable to get cell from Window", "cell", i)
 			return
 		}
 		p := ""

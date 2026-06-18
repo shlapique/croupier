@@ -3,11 +3,14 @@ package preloader
 import (
 	"context"
 	// "errors"
-	"fmt"
+	// "fmt"
+	"log/slog"
 	"time"
 )
 
 type Worker[T any] struct {
+	l *slog.Logger
+
 	Id     int
 	Offset int // current job.offset (if busy == true)
 
@@ -29,8 +32,9 @@ type fetchResult[T any] struct {
 	err error
 }
 
-func newWorker[T any](id int, jobChan chan *Job[T], fetchFunc Fetcher[T], timeout time.Duration) *Worker[T] {
+func newWorker[T any](l *slog.Logger, id int, jobChan chan *Job[T], fetchFunc Fetcher[T], timeout time.Duration) *Worker[T] {
 	return &Worker[T]{
+		l:       l,
 		Id:      id,
 		jobs:    jobChan,
 		Ctrl:    make(chan int, 100),
@@ -40,38 +44,38 @@ func newWorker[T any](id int, jobChan chan *Job[T], fetchFunc Fetcher[T], timeou
 }
 
 func (w *Worker[T]) run(ctx context.Context) {
-	fmt.Printf("[worker %d] running\n", w.Id)
+	w.l.Info("running")
 	defer close(w.Ctrl)
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[worker %d] killed\n", w.Id)
+			w.l.Info("killed")
 			return
 		case job, ok := <-w.jobs:
 			if !ok {
-				fmt.Printf("[worker %d] jobChan closed!\n", w.Id)
+				w.l.Info("jobChan closed!")
 				return
 			}
-			fmt.Printf("[worker %d] got new job: %d\n", w.Id, job.offset)
+			w.l.Info("got new job", "job.offset", job.offset)
 
 			// get the item from data and assign where it belongs to
 			w.Busy = true
 			w.Offset = job.offset
 			v, err := w.timeoutFetch(ctx, job.offset)
 			if err != nil {
-				fmt.Printf("[worker %d] Unable to fetch!: %v\n", w.Id, err)
+				w.l.Error("Unable to fetch!", "err", err)
 				w.Busy = false
 				continue
 			}
 			if v != nil {
-				fmt.Printf("[worker %d] got item: %s!\n", w.Id, *v)
+				w.l.Debug("got item", "value", *v)
 				*job.el = *v
 			} else {
 				job.el = nil
 			}
 			w.Busy = false
-			fmt.Printf("[worker %d] OK\n", w.Id)
+			w.l.Info("Waiting for a new job")
 		}
 	}
 }
@@ -83,7 +87,7 @@ func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (*T, error) {
 	result := make(chan fetchResult[T], 1)
 
 	go func() {
-		fmt.Printf("[worker %d] Fetching %d ...\n", w.Id, i)
+		w.l.Debug("Fetching", "i", i)
 		v, err := w.fetch(i)
 		result <- fetchResult[T]{v: &v, err: err}
 	}()
@@ -93,7 +97,7 @@ func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (*T, error) {
 		return r.v, r.err
 
 	case indexToKill := <-w.Ctrl:
-		fmt.Printf("[worker %d] job %d cancelled!\n", w.Id, indexToKill)
+		w.l.Info("job cancelled!", "index", indexToKill)
 		return nil, nil
 
 	case <-ctx.Done():

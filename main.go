@@ -7,15 +7,15 @@ import (
 	"embed"
 	"encoding/hex"
 	"errors"
-	"fmt"
+	// "fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"log"
+	"log/slog"
 	"net"
-	// "log/slog"
 
 	_ "golang.org/x/crypto/x509roots/fallback"
 
@@ -55,16 +55,21 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	// logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	// logger.Info("started!")
+	level := slog.LevelInfo
+	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
+		level = slog.LevelDebug
+	}
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	rootL := slog.New(handler)
+	slog.SetDefault(rootL)
 
 	token := getEnv("YANDEX_DISK_TOKEN", "")
 	if token == "" {
-		fmt.Println("YANDEX_DISK_TOKEN env var is required!")
+		slog.Error("YANDEX_DISK_TOKEN env var is required!")
 		return
 	}
 
-	// we need this for Termux
+	// we need this for Termux dns
 	if dns := os.Getenv("CROUPIER_DNS"); dns != "" {
 		net.DefaultResolver = &net.Resolver{
 			PreferGo: true,
@@ -78,37 +83,41 @@ func main() {
 	// load config
 	cfg, err := config.Load(configFile)
 	if err != nil {
-		fmt.Printf("Unable to load config: %s\n", err)
+		slog.Error("Unable to load config", "err", err)
 		return
 	}
-	fmt.Printf("config loaded!\n", configFile)
+	slog.Info("config loaded!")
 
+	// Yadisk client
 	client := yadisk.New(yadisk.Config{
+		L:       rootL,
 		Token:   token,
 		Timeout: time.Duration(cfg.Client.Timeout) * time.Second,
 	})
 	// get inital info about folder
 	meta, err := client.GetMeta(ctx, cfg.Client.Path, cfg.Client.PageSize, 0)
 	if err != nil {
-		fmt.Println("Error: ", err)
+		slog.Error("Unable to get initial folder info", "err", err)
+		return
 	}
 
-	fmt.Printf("Name: %s\n", meta.Name)
-	fmt.Println("Meta: ", meta)
+	slog.Debug("Folder Name", "meta.Name", meta.Name)
+	slog.Debug("Folder Meta", "meta", meta)
 	if meta.Type == "dir" {
-		fmt.Println("Its a dir:", meta.Name, "at path:", meta.Path, "!")
-		fmt.Println("Embed FULL: ", *meta.Embedded)
+		slog.Debug("Its a dir", meta.Name, "at path", meta.Path, "!")
+		// slog.Debug("Embed FULL", "*meta.Embedded", *meta.Embedded)
 	} else {
-		fmt.Println("ITS NOT A DIR!")
+		slog.Error("Incorrect data source", meta.Name, "is not a folder")
 		return
 	}
 
 	total := meta.Embedded.Total
 	maxOffset := total / cfg.Client.PageSize
-	fmt.Printf("total [%d], pageSize [%d], maxOffset [%d]\n", total, cfg.Client.PageSize, maxOffset)
+	slog.Debug("folder properties", "total", total, "pageSize", cfg.Client.PageSize, "maxOffset", maxOffset)
 
 	// create and init preloader
 	pConfig := preloader.Config[yadisk.Page]{
+		L:         rootL,
 		Offset:    0,
 		MinOffset: 0,
 		MaxOffset: maxOffset,
@@ -142,16 +151,15 @@ func main() {
 
 	loader, err := preloader.New(ctx, pConfig)
 	if err != nil {
-		fmt.Println("Unable to create New Loader:", err)
+		rootL.Error("Unable to create New Loader", "err", err)
+		return
 	}
 	// init preloader
 	loader.Init()
 
-	fmt.Println("Now printing current window state...")
-	loader.ShowWindow()
-
 	// create downloader
 	dConfig := downloader.Config{
+		L:            rootL,
 		DownloadPath: cfg.Downloader.Path,
 		MaxNumFiles:  cfg.Downloader.MaxConcurrentFiles,
 		WorkersNum:   cfg.Downloader.WorkersNum,
@@ -160,6 +168,7 @@ func main() {
 
 	// create a server
 	serv := server.New(
+		rootL,
 		&server.Backend[yadisk.Page]{
 			client,
 			loader,

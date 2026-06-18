@@ -7,6 +7,7 @@ import (
 	"sync"
 	// "errors"
 	"fmt"
+	"log/slog"
 
 	"croupier/internal/downloader"
 	"croupier/internal/preloader"
@@ -18,6 +19,7 @@ type PreloaderHandlers[T any] struct {
 }
 
 type DownloaderHandlers struct {
+	l          *slog.Logger
 	mu         sync.Mutex
 	cancel     context.CancelFunc
 	downloader *downloader.Downloader
@@ -71,9 +73,6 @@ func (h *DownloaderHandlers) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Got files to download:\n")
-	fmt.Printf("%v", files)
-
 	h.mu.Lock()
 	if h.cancel != nil {
 		h.cancel()
@@ -89,7 +88,7 @@ func (h *DownloaderHandlers) Download(w http.ResponseWriter, r *http.Request) {
 			resp, err := h.client.GetDownloadLink(ctx, file)
 
 			if err != nil {
-				fmt.Printf("Unable to get download link for a file: %s -> Skipping\n", file.Id)
+				h.l.Debug("Unable to get download link for a file -> Skipping", "file", file.Id)
 				continue
 			}
 			file.Href = resp.Href
@@ -98,8 +97,7 @@ func (h *DownloaderHandlers) Download(w http.ResponseWriter, r *http.Request) {
 			case <-ctx.Done():
 				return
 			case h.downloader.FilesChan <- &file:
-				// TODO remove
-				fmt.Printf("added file [%s] to file chan\n", file.Id)
+				h.l.Debug("added file to file chan", "file", file.Id)
 			}
 		}
 	}()
@@ -116,6 +114,6 @@ func (h *DownloaderHandlers) CancelDownloads(w http.ResponseWriter, r *http.Requ
 	h.mu.Unlock()
 
 	h.downloader.CancelAll()
-	fmt.Printf("CancelDownloads fired!\n")
+	h.l.Debug("CancelDownloads fired!")
 	w.WriteHeader(http.StatusOK)
 }

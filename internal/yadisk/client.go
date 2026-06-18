@@ -11,6 +11,7 @@ import (
 	// "os/signal"
 	// "crypto/md5"
 	// "io"
+	"log/slog"
 	"strconv"
 	"time"
 )
@@ -18,23 +19,33 @@ import (
 const baseURL = "https://cloud-api.yandex.net/v1/disk/resources"
 
 type Client struct {
+	l *slog.Logger
+
 	token   string
 	http    *http.Client
 	baseURL *url.URL
 }
 
 type Config struct {
+	L       *slog.Logger
 	Token   string
 	Timeout time.Duration
 }
 
 func New(config Config) *Client {
+	l := config.L
+	if l == nil {
+		l = slog.New(slog.Default().Handler())
+	}
+	l = l.With("pkg", "client")
+
 	pURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil
 	}
 
 	return &Client{
+		l:       l,
 		token:   config.Token,
 		http:    &http.Client{Timeout: config.Timeout * time.Second},
 		baseURL: pURL,
@@ -48,7 +59,7 @@ func New(config Config) *Client {
 func (c *Client) GetMeta(ctx context.Context, path string, limit int, offset int) (*Resource, error) {
 	u := *c.baseURL
 
-	fmt.Printf("Full path: %s\n", u.Path)
+	c.l.Debug("Full path", "path", u.Path)
 
 	q := u.Query()
 	q.Set("path", path)
@@ -56,7 +67,7 @@ func (c *Client) GetMeta(ctx context.Context, path string, limit int, offset int
 	q.Set("offset", strconv.Itoa(offset))
 	u.RawQuery = q.Encode()
 
-	fmt.Printf("Full encoded queuery: %s\n", u.RawQuery)
+	c.l.Debug("Full encoded queuery", "q", u.RawQuery)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
@@ -89,7 +100,7 @@ func MapSubset[T any, U any](items *[]T, f func(T) U) []U {
 
 // returns href to direct download with smth like curl
 func (c *Client) GetDownloadLink(ctx context.Context, file File) (*GetLinkResponse, error) {
-	fmt.Printf("Trying to get download link to a file [%s]\n", file.Path)
+	c.l.Debug("Trying to get download link to a file", "path", file.Path)
 
 	u := *c.baseURL
 
@@ -98,7 +109,7 @@ func (c *Client) GetDownloadLink(ctx context.Context, file File) (*GetLinkRespon
 	q.Set("path", file.Path)
 	u.RawQuery = q.Encode()
 
-	fmt.Printf("Full encoded queuery: %s\n", u.RawQuery)
+	c.l.Debug("Full encoded queuery", "q", u.RawQuery)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
@@ -116,7 +127,6 @@ func (c *Client) GetDownloadLink(ctx context.Context, file File) (*GetLinkRespon
 	if err := json.NewDecoder(resp.Body).Decode(&getLinkResponse); err != nil {
 		return nil, err
 	}
-	fmt.Printf("GET response: %v\n", getLinkResponse)
 
 	return &getLinkResponse, nil
 }

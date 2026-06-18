@@ -2,8 +2,8 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"

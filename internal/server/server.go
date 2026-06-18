@@ -9,9 +9,9 @@ import (
 	// "sync"
 	// "errors"
 	"embed"
-	"fmt"
+	// "fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 
 	"croupier/internal/downloader"
 	"croupier/internal/preloader"
@@ -19,6 +19,8 @@ import (
 )
 
 type Server[T any] struct {
+	l *slog.Logger
+
 	srv     *http.Server
 	Backend *Backend[T]
 	Port    string
@@ -30,7 +32,12 @@ type Backend[T any] struct {
 	Downloader *downloader.Downloader
 }
 
-func New[T any](backend *Backend[T], port string, assets embed.FS) *Server[T] {
+func New[T any](l *slog.Logger, backend *Backend[T], port string, assets embed.FS) *Server[T] {
+	if l == nil {
+		l = slog.New(slog.Default().Handler())
+	}
+	l = l.With("pkg", "server")
+
 	mux := http.NewServeMux()
 
 	sub, err := fs.Sub(assets, "static")
@@ -49,6 +56,7 @@ func New[T any](backend *Backend[T], port string, assets embed.FS) *Server[T] {
 	mux.HandleFunc("POST /prev", ph.Prev)
 
 	dh := &DownloaderHandlers{
+		l:          l,
 		client:     backend.Client,
 		downloader: backend.Downloader,
 	}
@@ -61,6 +69,7 @@ func New[T any](backend *Backend[T], port string, assets embed.FS) *Server[T] {
 		Handler: mux,
 	}
 	return &Server[T]{
+		l:       l,
 		srv:     srv,
 		Backend: backend,
 		Port:    port,
@@ -68,15 +77,19 @@ func New[T any](backend *Backend[T], port string, assets embed.FS) *Server[T] {
 }
 
 func (server *Server[T]) Run(ctx context.Context) {
-	fmt.Printf("server listening on %s\n", server.Port)
+	server.l.Info("listening", "port", server.Port)
 
 	go func() {
 		<-ctx.Done()
-		fmt.Printf("Server killed\n")
+		server.l.Info("killed")
 		server.srv.Shutdown(context.Background())
 	}()
 
 	go func() {
-		log.Fatal(server.srv.ListenAndServe())
+		err := server.srv.ListenAndServe()
+		if err != nil {
+			server.l.Error("Error occured", "err", err)
+			return
+		}
 	}()
 }

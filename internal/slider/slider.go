@@ -3,7 +3,7 @@ package slider
 import (
 	// "context"
 	// "sync"
-	"errors"
+	// "errors"
 	"fmt"
 )
 
@@ -14,8 +14,7 @@ type SlidingWindow[T any] struct {
 
 func New[T any](size int) (*SlidingWindow[T], error) {
 	if size <= 1 {
-		fmt.Println("Are you stupid.. sliding window with size", size, "?! hell na")
-		return nil, errors.New(fmt.Sprintf("Are you stupid.. sliding window with size %d?! hell na", size))
+		return nil, fmt.Errorf("Are you stupid.. sliding window with size %d?! hell na", size)
 	}
 
 	sw := &SlidingWindow[T]{
@@ -27,7 +26,6 @@ func New[T any](size int) (*SlidingWindow[T], error) {
 
 // some els in data may be <nil>
 func (sw *SlidingWindow[T]) Init(data []*T) {
-	fmt.Println("Intiating SlidingWindow with data")
 	for _, v := range data {
 		sw.rb.add(v)
 	}
@@ -38,7 +36,6 @@ func (sw *SlidingWindow[T]) SlideLeft(el *T) error {
 	if sw.rb.way != way {
 		err := sw.rb.changeWay(way)
 		if err != nil {
-			fmt.Println("failed to change way:", err)
 			return err
 		}
 	}
@@ -50,9 +47,7 @@ func (sw *SlidingWindow[T]) SlideRight(el *T) error {
 	way := Right
 	if sw.rb.way != way {
 		err := sw.rb.changeWay(way)
-
 		if err != nil {
-			fmt.Println("failed to change way:", err)
 			return err
 		}
 	}
@@ -85,8 +80,7 @@ func (sw *SlidingWindow[T]) getLR() (int, int) {
 // fake 'getCell' i.e. relative get [l _ i _ _ _ r]
 func (sw *SlidingWindow[T]) GetCell(index int) (*T, error) {
 	if index < 0 || index > sw.Size-1 {
-		fmt.Printf("Invalid SlidingWindow index [%d]\n", index)
-		return nil, errors.New(fmt.Sprintf("Invalid SlidingWindow index [%d]\n", index))
+		return nil, fmt.Errorf("Invalid SlidingWindow index [%d]\n", index)
 	}
 	l, _ := sw.getLR()
 	return sw.rb.buffer[(l+index)%sw.Size], nil

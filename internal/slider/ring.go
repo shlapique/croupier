@@ -3,7 +3,7 @@ package slider
 import (
 	// "context"
 	// "sync"
-	"errors"
+	// "errors"
 	"fmt"
 )
 
@@ -45,11 +45,9 @@ func (rb *ringBuffer[T]) changeWay(newWay Way) error {
 			rb.way = newWay
 			return nil
 		default:
-			return errors.New(fmt.Sprintf("unable to determine way: %v", newWay))
+			return fmt.Errorf("unable to determine way: %v", newWay)
 		}
 	} else {
-		fmt.Println("current buffer way:", rb.way)
-		fmt.Println("new way:", newWay, "-> nothing to do")
 		return nil
 	}
 }
@@ -62,5 +60,4 @@ func (rb *ringBuffer[T]) add(el *T) {
 	case Right:
 		rb.ht = (rb.ht + 1) % rb.capacity
 	}
-	fmt.Println("New ht index:", rb.ht)
 }
