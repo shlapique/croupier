@@ -5,6 +5,7 @@ import (
 	// "sync"
 	"errors"
 	"fmt"
+	"time"
 
 	"croupier/internal/slider"
 )
@@ -42,6 +43,7 @@ type Config[T any] struct {
 	Lag int
 
 	FetchFunc Fetcher[T]
+	Timeout   time.Duration
 
 	WorkersNum int
 }
@@ -75,7 +77,7 @@ func New[T any](ctx context.Context, config Config[T]) (*Preloader[T], error) {
 	jobChan := make(chan *Job[T], 500)
 	// create workers
 	for i := range config.WorkersNum {
-		var w = newWorker[T](i, jobChan, config.FetchFunc)
+		var w = newWorker[T](i, jobChan, config.FetchFunc, config.Timeout)
 		go w.run(ctx)
 		workers[i] = w
 	}

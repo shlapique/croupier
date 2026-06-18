@@ -10,11 +10,11 @@ import (
 type Client struct {
 	Path     string `yaml:"path"`
 	PageSize int    `yaml:"page_size"`
-	Timeout  int `yaml:"timeout"`
+	Timeout  int    `yaml:"timeout"`
 }
 
 type Preloader struct {
-	Timeout  int `yaml:"timeout"`
+	Timeout    int `yaml:"timeout"`
 	WindowSize int `yaml:"window_size"`
 	WindowLag  int `yaml:"window_lag"`
 	WorkersNum int `yaml:"workers_num"`
@@ -48,6 +48,18 @@ func Load(path string) (*App, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
 	err = dec.Decode(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+func LoadDefault(c string) (*App, error) {
+	config := new(App)
+	dec := yaml.NewDecoder(bytes.NewReader([]byte(c)))
+	dec.KnownFields(true)
+	err := dec.Decode(&config)
 	if err != nil {
 		return nil, err
 	}

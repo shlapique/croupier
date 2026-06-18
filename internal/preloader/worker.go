@@ -17,7 +17,8 @@ type Worker[T any] struct {
 	minOffset int
 	maxOffset int
 
-	fetch Fetcher[T]
+	fetch   Fetcher[T]
+	timeout time.Duration
 
 	Busy bool
 	// mu
@@ -28,12 +29,13 @@ type fetchResult[T any] struct {
 	err error
 }
 
-func newWorker[T any](id int, jobChan chan *Job[T], fetchFunc Fetcher[T]) *Worker[T] {
+func newWorker[T any](id int, jobChan chan *Job[T], fetchFunc Fetcher[T], timeout time.Duration) *Worker[T] {
 	return &Worker[T]{
-		Id:    id,
-		jobs:  jobChan,
-		Ctrl:  make(chan int, 100),
-		fetch: fetchFunc,
+		Id:      id,
+		jobs:    jobChan,
+		Ctrl:    make(chan int, 100),
+		fetch:   fetchFunc,
+		timeout: timeout,
 	}
 }
 
@@ -74,11 +76,8 @@ func (w *Worker[T]) run(ctx context.Context) {
 	}
 }
 
-// set a timeout for fetch ALL opearations (e.g. 15s) -- sane
-// fetch itself may have timeout too
-// FIXME cfg
 func (w *Worker[T]) timeoutFetch(ctx context.Context, i int) (*T, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, w.timeout)
 	defer cancel()
 
 	result := make(chan fetchResult[T], 1)

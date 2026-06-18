@@ -43,6 +43,8 @@ By default Termux doesnt expose DNS correctly so run like this:
 CROUPIER_DNS=8.8.8.8:53 ./croupier
 ```
 
+To configure variables like `lag`, `window_size`, etc. put `config.yml` right next to the binary (check [example](./config.yml))
+
 ## how to build
 
 ### static build for ARMv7l
@@ -59,5 +61,4 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o cro
 
 ### TODO
 
-- add config
 - add proper logging

@@ -26,6 +26,26 @@ import (
 	"croupier/internal/yadisk"
 )
 
+var configFile = "./config.yml"
+var defaultConfig = `
+---
+client:
+  path: "disk:/kindle/"
+  page_size: 15
+  timeout: 15
+preloader: 
+  timeout: 15
+  window_size: 5
+  window_lag: 2
+  workers_num: 2
+downloader:
+  path: "./"
+  max_concurrent_files: 50
+  workers_num: 2
+server:
+  port: "1234"
+`
+
 //go:embed static/*
 var staticFS embed.FS
 
@@ -73,27 +93,22 @@ func main() {
 		}
 	}
 
-	cfg, err := config.Load("./config.yml")
+	// load config
+	cfg, err := config.Load(configFile)
 	if err != nil {
-		fmt.Printf("Unable to load config: \n", err)
-		return
+		fmt.Printf("Unable to load config [%s]: %s\n", configFile, err)
+		cfg, err = config.LoadDefault(defaultConfig)
+		if err != nil {
+			fmt.Printf("Unable to load default config: %s\n", err)
+			return
+		} else {
+			fmt.Printf("Default config loaded!\n")
+		}
 	}
-	// fmt.Printf("TEst print of cfg!\n")
-	// fmt.Printf("%v %v %v %v\n", cfg.Client, cfg.Preloader, cfg.Downloader, cfg.Server)
-
-	// debug := getEnv("DEBUG", "0")
-	// if debug == "1" {
-	// 	fmt.Println("DEBUG mode enabled")
-	// }
-
-	// BACKEND
-	// *******
-	// yaclient
-	// we need to spec num of items per page
-	// => limit
+	fmt.Printf("config [%s] loaded!\n", configFile)
 
 	client := yadisk.New(yadisk.Config{
-		Token: token,
+		Token:   token,
 		Timeout: time.Duration(cfg.Client.Timeout) * time.Second,
 	})
 	// get inital info about folder
@@ -121,8 +136,8 @@ func main() {
 		Offset:    0,
 		MinOffset: 0,
 		MaxOffset: maxOffset,
-		Size: cfg.Preloader.WindowSize,
-		Lag: cfg.Preloader.WindowLag,
+		Size:      cfg.Preloader.WindowSize,
+		Lag:       cfg.Preloader.WindowLag,
 		FetchFunc: func(i int) (yadisk.Page, error) {
 			if i >= 0 && i <= maxOffset {
 				// TODO
@@ -145,6 +160,7 @@ func main() {
 				return yadisk.Page{}, errors.New("i is out of bounds!")
 			}
 		},
+		Timeout:    time.Duration(cfg.Preloader.Timeout) * time.Second,
 		WorkersNum: cfg.Preloader.WorkersNum,
 	}
 
@@ -161,8 +177,8 @@ func main() {
 	// create downloader
 	dConfig := downloader.Config{
 		DownloadPath: cfg.Downloader.Path,
-		MaxNumFiles: cfg.Downloader.MaxConcurrentFiles,
-		WorkersNum: cfg.Downloader.WorkersNum,
+		MaxNumFiles:  cfg.Downloader.MaxConcurrentFiles,
+		WorkersNum:   cfg.Downloader.WorkersNum,
 	}
 	downloader := downloader.New(ctx, dConfig)
 
