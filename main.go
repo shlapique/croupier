@@ -27,24 +27,6 @@ import (
 )
 
 var configFile = "./config.yml"
-var defaultConfig = `
----
-client:
-  path: "disk:/kindle/"
-  page_size: 15
-  timeout: 15
-preloader: 
-  timeout: 15
-  window_size: 5
-  window_lag: 2
-  workers_num: 2
-downloader:
-  path: "./"
-  max_concurrent_files: 50
-  workers_num: 2
-server:
-  port: "1234"
-`
 
 //go:embed static/*
 var staticFS embed.FS
@@ -96,16 +78,10 @@ func main() {
 	// load config
 	cfg, err := config.Load(configFile)
 	if err != nil {
-		fmt.Printf("Unable to load config [%s]: %s\n", configFile, err)
-		cfg, err = config.LoadDefault(defaultConfig)
-		if err != nil {
-			fmt.Printf("Unable to load default config: %s\n", err)
-			return
-		} else {
-			fmt.Printf("Default config loaded!\n")
-		}
+		fmt.Printf("Unable to load config: %s\n", err)
+		return
 	}
-	fmt.Printf("config [%s] loaded!\n", configFile)
+	fmt.Printf("config loaded!\n", configFile)
 
 	client := yadisk.New(yadisk.Config{
 		Token:   token,
